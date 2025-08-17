@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   createAuthSession,
   isSessionValid,
@@ -9,6 +9,9 @@ import {
   getUserFromSession,
   getSessionCookieOptions,
   generateSessionToken,
+  parseSessionFromCookie,
+  serializeSessionToCookie,
+  createClearSessionCookie,
 } from '../../lib/auth';
 import type { User, AuthSession } from '../../types';
 import { AuthenticationError } from '../../types';
@@ -204,6 +207,61 @@ describe('Auth Utilities', () => {
       const token1 = generateSessionToken();
       const token2 = generateSessionToken();
       expect(token1).not.toBe(token2);
+    });
+  });
+
+  describe('parseSessionFromCookie', () => {
+    it('should parse valid session from cookie', () => {
+      const session = createAuthSession(mockUser, 'token', 3600);
+      const cookieValue = JSON.stringify(session);
+      
+      const result = parseSessionFromCookie(cookieValue);
+      
+      expect(result).toEqual(session);
+    });
+
+    it('should return null for invalid JSON', () => {
+      const result = parseSessionFromCookie('invalid-json');
+      expect(result).toBeNull();
+    });
+
+    it('should return null for expired session', () => {
+      const expiredSession = createAuthSession(mockUser, 'token', -1);
+      const cookieValue = JSON.stringify(expiredSession);
+      
+      const result = parseSessionFromCookie(cookieValue);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('serializeSessionToCookie', () => {
+    it('should serialize session to cookie string', () => {
+      const session = createAuthSession(mockUser, 'token', 3600);
+      
+      const result = serializeSessionToCookie(session, false);
+      
+      expect(result).toContain(`session=${JSON.stringify(session)}`);
+      expect(result).toContain('HttpOnly');
+      expect(result).toContain('SameSite=lax');
+      expect(result).toContain('Max-Age=3600');
+      expect(result).toContain('Path=/');
+      expect(result).not.toContain('Secure');
+    });
+
+    it('should include Secure flag in production', () => {
+      const session = createAuthSession(mockUser, 'token', 3600);
+      
+      const result = serializeSessionToCookie(session, true);
+      
+      expect(result).toContain('Secure');
+    });
+  });
+
+  describe('createClearSessionCookie', () => {
+    it('should create cookie string that clears session', () => {
+      const result = createClearSessionCookie();
+      
+      expect(result).toBe('session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax');
     });
   });
 });

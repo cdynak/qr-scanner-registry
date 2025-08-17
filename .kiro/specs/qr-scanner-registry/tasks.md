@@ -9,7 +9,6 @@
   - _Requirements: 4.1, 4.6, 5.6_
 
 - [x] 2. Configure Supabase integration and database schema
-
   - Create Supabase client configuration with environment variables
   - Write database migration scripts for users and scans tables
   - Implement Row Level Security (RLS) policies for data access control
@@ -18,11 +17,6 @@
   - _Requirements: 1.3, 3.2, 3.6_
 
 - [x] 3. Implement core TypeScript interfaces and utilities
-
-
-
-
-
   - Create shared types in src/types.ts for User, Scan, AuthSession interfaces
   - Implement authentication utility functions for session management
   - Create data validation utilities for scan content and user input
@@ -30,7 +24,7 @@
   - Write unit tests for all utility functions
   - _Requirements: 1.4, 3.2, 4.1_
 
-- [ ] 4. Set up Google OAuth authentication system
+- [x] 4. Set up Google OAuth authentication system
   - Configure Google OAuth client with environment variables
   - Create API route for Google OAuth callback handling (/api/auth/google.ts)
   - Implement session management with secure HTTP-only cookies
@@ -38,7 +32,8 @@
   - Write unit tests for authentication API routes with mocked Google OAuth
   - _Requirements: 1.1, 1.2, 1.3, 1.6_
 
-- [ ] 5. Create authentication UI components
+- [x] 5. Create authentication UI components
+
   - Implement LoginButton component with Google OAuth integration
   - Create UserProfile component to display authenticated user information
   - Build AuthGuard component for protecting routes

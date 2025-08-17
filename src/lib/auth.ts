@@ -125,3 +125,43 @@ export function generateSessionToken(): string {
   // For now, using a simple approach for testing
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
+
+/**
+ * Parses session from cookie string
+ */
+export function parseSessionFromCookie(cookieValue: string): AuthSession | null {
+  try {
+    const session = JSON.parse(cookieValue) as AuthSession;
+    return isSessionValid(session) ? session : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Serializes session to cookie string
+ */
+export function serializeSessionToCookie(
+  session: AuthSession,
+  isProduction: boolean = false
+): string {
+  const options = getSessionCookieOptions(isProduction);
+  const sessionJson = JSON.stringify(session);
+  
+  const cookieParts = [`session=${sessionJson}`];
+  
+  if (options.httpOnly) cookieParts.push('HttpOnly');
+  if (options.secure) cookieParts.push('Secure');
+  if (options.sameSite) cookieParts.push(`SameSite=${options.sameSite}`);
+  if (options.maxAge) cookieParts.push(`Max-Age=${options.maxAge}`);
+  if (options.path) cookieParts.push(`Path=${options.path}`);
+  
+  return cookieParts.join('; ');
+}
+
+/**
+ * Creates a cookie string to clear the session
+ */
+export function createClearSessionCookie(): string {
+  return 'session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax';
+}
