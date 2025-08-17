@@ -48,6 +48,13 @@ npm run build
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Fix ESLint issues
+- `npm run test` - Run unit tests
+- `npm run test:watch` - Run unit tests in watch mode
+- `npm run test:ui` - Run unit tests with UI
+- `npm run test:coverage` - Run unit tests with coverage report
+- `npm run e2e` - Run end-to-end tests
+- `npm run e2e:ui` - Run end-to-end tests with UI
+- `npm run e2e:debug` - Run end-to-end tests in debug mode
 
 ## Project Structure
 
