@@ -1,6 +1,11 @@
 // Re-export database types for convenience
 export type { User, UserInsert, UserUpdate, Scan, ScanInsert, ScanUpdate, ScanType } from './db/types';
 
+// Re-export utility functions and error types
+export * from './lib/auth';
+export * from './lib/validation';
+export * from './lib/errors';
+
 // Additional application-specific types
 export interface ScanCreateRequest {
   content: string;
