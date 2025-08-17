@@ -33,7 +33,6 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.6_
 
 - [x] 5. Create authentication UI components
-
   - Implement LoginButton component with Google OAuth integration
   - Create UserProfile component to display authenticated user information
   - Build AuthGuard component for protecting routes
@@ -41,7 +40,8 @@
   - Write unit tests for all authentication components
   - _Requirements: 1.1, 1.4, 1.5, 1.6_
 
-- [ ] 6. Implement QR/barcode scanning functionality
+- [x] 6. Implement QR/barcode scanning functionality
+
   - Create QRScanner component using react-qr-barcode-scanner
   - Implement camera permission handling with CameraPermissions component
   - Build ScanResult component to display decoded content
