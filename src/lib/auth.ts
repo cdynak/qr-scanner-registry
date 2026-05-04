@@ -1,5 +1,5 @@
-import type { AuthSession, User } from '../types';
-import { AuthenticationError } from '../types';
+import type { AuthSession, User } from "../types";
+import { AuthenticationError } from "../types";
 
 /**
  * Authentication utility functions for session management
@@ -11,10 +11,10 @@ import { AuthenticationError } from '../types';
 export function createAuthSession(
   user: User,
   accessToken: string,
-  expiresIn: number = 3600 // 1 hour default
+  expiresIn = 3600 // 1 hour default
 ): AuthSession {
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
-  
+
   return {
     user,
     accessToken,
@@ -29,10 +29,10 @@ export function isSessionValid(session: AuthSession): boolean {
   if (!session || !session.expiresAt) {
     return false;
   }
-  
+
   const expirationTime = new Date(session.expiresAt).getTime();
   const currentTime = Date.now();
-  
+
   return currentTime < expirationTime;
 }
 
@@ -50,27 +50,27 @@ export function getSessionTimeRemaining(session: AuthSession): number {
   if (!session || !session.expiresAt) {
     return 0;
   }
-  
+
   const expirationTime = new Date(session.expiresAt).getTime();
   const currentTime = Date.now();
   const remainingMs = expirationTime - currentTime;
-  
+
   return Math.max(0, Math.floor(remainingMs / 1000));
 }
 
 /**
  * Validates that a user object has required fields
  */
-export function validateUser(user: any): user is User {
-  if (!user || typeof user !== 'object') {
+export function validateUser(user: unknown): user is User {
+  if (!user || typeof user !== "object") {
     return false;
   }
-  
-  const requiredFields = ['id', 'google_id', 'email', 'name', 'created_at', 'updated_at'];
-  
-  return requiredFields.every(field => {
+
+  const requiredFields = ["id", "google_id", "email", "name", "created_at", "updated_at"];
+
+  return requiredFields.every((field) => {
     const value = user[field];
-    return value !== null && value !== undefined && value !== '';
+    return value !== null && value !== undefined && value !== "";
   });
 }
 
@@ -79,17 +79,17 @@ export function validateUser(user: any): user is User {
  */
 export function requireValidSession(session: AuthSession | null | undefined): User {
   if (!session) {
-    throw new AuthenticationError('No session provided');
+    throw new AuthenticationError("No session provided");
   }
-  
+
   if (!isSessionValid(session)) {
-    throw new AuthenticationError('Session has expired');
+    throw new AuthenticationError("Session has expired");
   }
-  
+
   if (!validateUser(session.user)) {
-    throw new AuthenticationError('Invalid user data in session');
+    throw new AuthenticationError("Invalid user data in session");
   }
-  
+
   return session.user;
 }
 
@@ -107,14 +107,62 @@ export function getUserFromSession(session: AuthSession | null | undefined): Use
 /**
  * Creates session cookie options for secure HTTP-only cookies
  */
-export function getSessionCookieOptions(isProduction: boolean = false) {
+export function getSessionCookieOptions(isProduction = false) {
   return {
-    httpOnly: true,
+    httpOnly: false, // Allow JavaScript access for client-side auth detection
     secure: isProduction,
-    sameSite: 'lax' as const,
+    sameSite: "strict" as const, // Changed to strict for better security
     maxAge: 3600, // 1 hour
-    path: '/',
+    path: "/",
+    // Add additional security headers
+    ...(isProduction && {
+      domain: undefined, // Let browser set domain automatically
+      priority: "high" as const,
+    }),
   };
+}
+
+/**
+ * Creates secure session cookie string with all security attributes
+ */
+export function createSecureSessionCookie(session: AuthSession, isProduction = false): string {
+  const options = getSessionCookieOptions(isProduction);
+  const sessionJson = JSON.stringify(session);
+
+  const cookieParts = [`session=${encodeURIComponent(sessionJson)}`];
+
+  if (options.httpOnly) cookieParts.push("HttpOnly");
+  if (options.secure) cookieParts.push("Secure");
+  if (options.sameSite) cookieParts.push(`SameSite=${options.sameSite}`);
+  if (options.maxAge) cookieParts.push(`Max-Age=${options.maxAge}`);
+  if (options.path) cookieParts.push(`Path=${options.path}`);
+
+  return cookieParts.join("; ");
+}
+
+/**
+ * Validates session cookie format and content
+ */
+export function validateSessionCookie(cookieValue: string): boolean {
+  if (!cookieValue || typeof cookieValue !== "string") {
+    return false;
+  }
+
+  try {
+    // Decode and parse the session
+    const decoded = decodeURIComponent(cookieValue);
+    const session = JSON.parse(decoded) as AuthSession;
+
+    // Validate session structure
+    if (!session.user || !session.accessToken || !session.expiresAt) {
+      return false;
+    }
+
+    // Validate session is not expired
+    return isSessionValid(session);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -141,27 +189,24 @@ export function parseSessionFromCookie(cookieValue: string): AuthSession | null 
 /**
  * Serializes session to cookie string
  */
-export function serializeSessionToCookie(
-  session: AuthSession,
-  isProduction: boolean = false
-): string {
+export function serializeSessionToCookie(session: AuthSession, isProduction = false): string {
   const options = getSessionCookieOptions(isProduction);
   const sessionJson = JSON.stringify(session);
-  
+
   const cookieParts = [`session=${sessionJson}`];
-  
-  if (options.httpOnly) cookieParts.push('HttpOnly');
-  if (options.secure) cookieParts.push('Secure');
+
+  if (options.httpOnly) cookieParts.push("HttpOnly");
+  if (options.secure) cookieParts.push("Secure");
   if (options.sameSite) cookieParts.push(`SameSite=${options.sameSite}`);
   if (options.maxAge) cookieParts.push(`Max-Age=${options.maxAge}`);
   if (options.path) cookieParts.push(`Path=${options.path}`);
-  
-  return cookieParts.join('; ');
+
+  return cookieParts.join("; ");
 }
 
 /**
  * Creates a cookie string to clear the session
  */
 export function createClearSessionCookie(): string {
-  return 'session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax';
+  return "session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax";
 }

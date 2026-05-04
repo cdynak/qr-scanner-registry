@@ -1,4 +1,4 @@
-import { DatabaseError, AuthenticationError, ValidationError } from '../types';
+import { DatabaseError, ValidationError } from "../types";
 
 /**
  * Error handling utilities with custom error types
@@ -8,30 +8,52 @@ import { DatabaseError, AuthenticationError, ValidationError } from '../types';
  * Additional custom error types
  */
 export class NetworkError extends Error {
-  constructor(message: string = 'Network request failed', public statusCode?: number) {
+  constructor(
+    message = "Network request failed",
+    public statusCode?: number
+  ) {
     super(message);
-    this.name = 'NetworkError';
+    this.name = "NetworkError";
   }
 }
 
 export class CameraError extends Error {
-  constructor(message: string = 'Camera access failed', public code?: string) {
+  constructor(
+    message = "Camera access failed",
+    public code?: string
+  ) {
     super(message);
-    this.name = 'CameraError';
+    this.name = "CameraError";
   }
 }
 
 export class ScanError extends Error {
-  constructor(message: string = 'Scan processing failed', public scanType?: string) {
+  constructor(
+    message = "Scan processing failed",
+    public scanType?: string
+  ) {
     super(message);
-    this.name = 'ScanError';
+    this.name = "ScanError";
   }
 }
 
 export class RateLimitError extends Error {
-  constructor(message: string = 'Rate limit exceeded', public retryAfter?: number) {
+  constructor(
+    message = "Rate limit exceeded",
+    public retryAfter?: number
+  ) {
     super(message);
-    this.name = 'RateLimitError';
+    this.name = "RateLimitError";
+  }
+}
+
+export class AuthenticationError extends Error {
+  constructor(
+    message = "Authentication failed",
+    public code?: string
+  ) {
+    super(message);
+    this.name = "AuthenticationError";
   }
 }
 
@@ -39,10 +61,10 @@ export class RateLimitError extends Error {
  * Error severity levels
  */
 export enum ErrorSeverity {
-  LOW = 'low',
-  MEDIUM = 'medium',
-  HIGH = 'high',
-  CRITICAL = 'critical',
+  LOW = "low",
+  MEDIUM = "medium",
+  HIGH = "high",
+  CRITICAL = "critical",
 }
 
 /**
@@ -57,19 +79,21 @@ export interface ErrorInfo {
   statusCode?: number;
   timestamp: string;
   userMessage: string;
+  retryable: boolean;
+  context?: Record<string, unknown>;
 }
 
 /**
  * Maps error types to user-friendly messages
  */
 const ERROR_USER_MESSAGES: Record<string, string> = {
-  DatabaseError: 'We\'re having trouble accessing your data. Please try again.',
-  AuthenticationError: 'Please log in to continue.',
-  ValidationError: 'Please check your input and try again.',
-  NetworkError: 'Connection failed. Please check your internet and try again.',
-  CameraError: 'Camera access is required for scanning. Please allow camera permissions.',
-  ScanError: 'Unable to scan the code. Please try again with better lighting.',
-  RateLimitError: 'Too many requests. Please wait a moment and try again.',
+  DatabaseError: "We're having trouble accessing your data. Please try again.",
+  AuthenticationError: "Please log in to continue.",
+  ValidationError: "Please check your input and try again.",
+  NetworkError: "Connection failed. Please check your internet and try again.",
+  CameraError: "Camera access is required for scanning. Please allow camera permissions.",
+  ScanError: "Unable to scan the code. Please try again with better lighting.",
+  RateLimitError: "Too many requests. Please wait a moment and try again.",
 };
 
 /**
@@ -86,75 +110,108 @@ const ERROR_SEVERITIES: Record<string, ErrorSeverity> = {
 };
 
 /**
+ * Determines if an error is retryable
+ */
+function isRetryableError(error: unknown): boolean {
+  if (error instanceof NetworkError) {
+    return true;
+  }
+
+  if (error instanceof DatabaseError) {
+    return true;
+  }
+
+  if (error instanceof ScanError) {
+    return true;
+  }
+
+  if (error instanceof CameraError) {
+    // Some camera errors are retryable (permission denied, device busy)
+    return error.code !== "NotSupportedError";
+  }
+
+  return false;
+}
+
+/**
  * Converts any error to structured error information
  */
-export function createErrorInfo(error: unknown): ErrorInfo {
+export function createErrorInfo(error: unknown, context?: Record<string, unknown>): ErrorInfo {
   const timestamp = new Date().toISOString();
-  
+
   if (error instanceof Error) {
     const severity = ERROR_SEVERITIES[error.name] || ErrorSeverity.MEDIUM;
-    const userMessage = ERROR_USER_MESSAGES[error.name] || 'An unexpected error occurred. Please try again.';
-    
+    const userMessage = ERROR_USER_MESSAGES[error.name] || "An unexpected error occurred. Please try again.";
+
     const errorInfo: ErrorInfo = {
       name: error.name,
       message: error.message,
       severity,
       timestamp,
       userMessage,
+      retryable: isRetryableError(error),
+      context,
     };
-    
+
     // Add specific properties based on error type
     if (error instanceof ValidationError && error.field) {
       errorInfo.field = error.field;
     }
-    
+
     if (error instanceof NetworkError && error.statusCode) {
       errorInfo.statusCode = error.statusCode;
     }
-    
+
     if (error instanceof CameraError && error.code) {
       errorInfo.code = error.code;
     }
-    
+
     if (error instanceof RateLimitError && error.retryAfter) {
       errorInfo.statusCode = 429;
     }
-    
+
+    if (error instanceof AuthenticationError && error.code) {
+      errorInfo.code = error.code;
+    }
+
     return errorInfo;
   }
-  
+
   // Handle non-Error objects
   return {
-    name: 'UnknownError',
+    name: "UnknownError",
     message: String(error),
     severity: ErrorSeverity.MEDIUM,
     timestamp,
-    userMessage: 'An unexpected error occurred. Please try again.',
+    userMessage: "An unexpected error occurred. Please try again.",
+    retryable: false,
+    context,
   };
 }
 
 /**
  * Logs error information to console (in development) or external service (in production)
  */
-export function logError(error: unknown, context?: Record<string, any>, isDev?: boolean): void {
-  const errorInfo = createErrorInfo(error);
-  
+export function logError(error: unknown, context?: Record<string, unknown>, isDev?: boolean): void {
+  const errorInfo = createErrorInfo(error, context);
+
   const logData = {
     ...errorInfo,
-    context,
     stack: error instanceof Error ? error.stack : undefined,
   };
-  
+
   // In development, log to console
   // Check for DEV environment variable or NODE_ENV, or use provided isDev parameter
-  const shouldLog = isDev !== undefined ? isDev : 
-    ((typeof import.meta !== 'undefined' && import.meta.env?.DEV) || 
-     process.env.NODE_ENV === 'development');
-  
+  const shouldLog =
+    isDev !== undefined
+      ? isDev
+      : (typeof import.meta !== "undefined" && import.meta.env?.DEV) || process.env.NODE_ENV === "development";
+
   if (shouldLog) {
-    console.error('Error logged:', logData);
+    // eslint-disable-next-line no-console
+    console.error("Error logged:", logData);
   }
-  
+
   // In production, you would send to an external logging service
   // Example: sendToLoggingService(logData);
 }
@@ -162,34 +219,36 @@ export function logError(error: unknown, context?: Record<string, any>, isDev?: 
 /**
  * Handles errors in async functions with proper logging
  */
-export function handleAsyncError<T>(
+export async function handleAsyncError<T>(
   promise: Promise<T>,
-  context?: Record<string, any>,
+  context?: Record<string, unknown>,
   isDev?: boolean
 ): Promise<T> {
-  return promise.catch((error) => {
+  try {
+    return await promise;
+  } catch (error) {
     logError(error, context, isDev);
     throw error;
-  });
+  }
 }
 
 /**
  * Wraps a function to catch and handle errors
  */
-export function withErrorHandling<T extends (...args: any[]) => any>(
+export function withErrorHandling<T extends (...args: unknown[]) => unknown>(
   fn: T,
-  context?: Record<string, any>,
+  context?: Record<string, unknown>,
   isDev?: boolean
 ): T {
   return ((...args: Parameters<T>) => {
     try {
       const result = fn(...args);
-      
+
       // Handle async functions
       if (result instanceof Promise) {
         return handleAsyncError(result, context, isDev);
       }
-      
+
       return result;
     } catch (error) {
       logError(error, context, isDev);
@@ -203,40 +262,22 @@ export function withErrorHandling<T extends (...args: any[]) => any>(
  */
 export function createApiErrorResponse(error: unknown, statusCode?: number) {
   const errorInfo = createErrorInfo(error);
-  
+
   return {
     error: errorInfo.userMessage,
     message: errorInfo.message,
     code: errorInfo.code,
     field: errorInfo.field,
     timestamp: errorInfo.timestamp,
+    retryable: errorInfo.retryable,
     statusCode: statusCode || errorInfo.statusCode || 500,
   };
 }
 
 /**
- * Determines if an error is retryable
- */
-export function isRetryableError(error: unknown): boolean {
-  if (error instanceof NetworkError) {
-    return true;
-  }
-  
-  if (error instanceof DatabaseError) {
-    return true;
-  }
-  
-  if (error instanceof ScanError) {
-    return true;
-  }
-  
-  return false;
-}
-
-/**
  * Gets retry delay in milliseconds with exponential backoff
  */
-export function getRetryDelay(attempt: number, baseDelay: number = 1000): number {
+export function getRetryDelay(attempt: number, baseDelay = 1000): number {
   const maxDelay = 30000; // 30 seconds max
   const delay = baseDelay * Math.pow(2, attempt - 1);
   return Math.min(delay, maxDelay);
@@ -247,31 +288,31 @@ export function getRetryDelay(attempt: number, baseDelay: number = 1000): number
  */
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  maxAttempts: number = 3,
-  baseDelay: number = 1000,
-  context?: Record<string, any>,
+  maxAttempts = 3,
+  baseDelay = 1000,
+  context?: Record<string, unknown>,
   isDev?: boolean
 ): Promise<T> {
   let lastError: unknown;
-  
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error;
-      
+
       if (attempt === maxAttempts || !isRetryableError(error)) {
         logError(error, { ...context, attempt, maxAttempts }, isDev);
         throw error;
       }
-      
+
       const delay = getRetryDelay(attempt, baseDelay);
       logError(error, { ...context, attempt, maxAttempts, retryDelay: delay }, isDev);
-      
-      await new Promise(resolve => setTimeout(resolve, delay));
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-  
+
   throw lastError;
 }
 
@@ -290,13 +331,132 @@ export function safeExecute<T>(fn: () => T): { result?: T; error?: ErrorInfo } {
 /**
  * Safely executes an async function and returns result or error
  */
-export async function safeExecuteAsync<T>(
-  fn: () => Promise<T>
-): Promise<{ result?: T; error?: ErrorInfo }> {
+export async function safeExecuteAsync<T>(fn: () => Promise<T>): Promise<{ result?: T; error?: ErrorInfo }> {
   try {
     const result = await fn();
     return { result };
   } catch (error) {
     return { error: createErrorInfo(error) };
+  }
+}
+
+/**
+ * Circuit breaker pattern for handling repeated failures
+ */
+export class CircuitBreaker {
+  private failures = 0;
+  private lastFailureTime = 0;
+  private state: "closed" | "open" | "half-open" = "closed";
+
+  constructor(
+    private threshold = 5,
+    private timeout = 60000 // 1 minute
+  ) {}
+
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.state === "open") {
+      if (Date.now() - this.lastFailureTime > this.timeout) {
+        this.state = "half-open";
+      } else {
+        throw new Error("Circuit breaker is open");
+      }
+    }
+
+    try {
+      const result = await fn();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+
+  private onSuccess(): void {
+    this.failures = 0;
+    this.state = "closed";
+  }
+
+  private onFailure(): void {
+    this.failures++;
+    this.lastFailureTime = Date.now();
+
+    if (this.failures >= this.threshold) {
+      this.state = "open";
+    }
+  }
+
+  getState(): string {
+    return this.state;
+  }
+
+  reset(): void {
+    this.failures = 0;
+    this.state = "closed";
+    this.lastFailureTime = 0;
+  }
+}
+
+/**
+ * Rate limiter for API calls
+ */
+export class RateLimiter {
+  private requests: number[] = [];
+
+  constructor(
+    private maxRequests: number,
+    private windowMs: number
+  ) {}
+
+  canMakeRequest(): boolean {
+    const now = Date.now();
+    this.requests = this.requests.filter((time) => now - time < this.windowMs);
+
+    if (this.requests.length >= this.maxRequests) {
+      return false;
+    }
+
+    this.requests.push(now);
+    return true;
+  }
+
+  getTimeUntilReset(): number {
+    if (this.requests.length === 0) {
+      return 0;
+    }
+
+    const oldestRequest = Math.min(...this.requests);
+    return Math.max(0, this.windowMs - (Date.now() - oldestRequest));
+  }
+}
+
+/**
+ * Global error handler for unhandled promise rejections and errors
+ */
+export function setupGlobalErrorHandling(): void {
+  if (typeof window !== "undefined") {
+    // Browser environment
+    window.addEventListener("error", (event) => {
+      logError(event.error, {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      });
+    });
+
+    window.addEventListener("unhandledrejection", (event) => {
+      logError(event.reason, { type: "unhandledrejection" });
+    });
+  }
+
+  if (typeof process !== "undefined") {
+    // Node.js environment
+    process.on("uncaughtException", (error) => {
+      logError(error, { type: "uncaughtException" });
+    });
+
+    process.on("unhandledRejection", (reason) => {
+      logError(reason, { type: "unhandledRejection" });
+    });
   }
 }

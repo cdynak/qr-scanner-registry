@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   createAuthSession,
   isSessionValid,
@@ -12,256 +12,256 @@ import {
   parseSessionFromCookie,
   serializeSessionToCookie,
   createClearSessionCookie,
-} from '../../lib/auth';
-import type { User, AuthSession } from '../../types';
-import { AuthenticationError } from '../../types';
+} from "../../lib/auth";
+import type { User, AuthSession } from "../../types";
+import { AuthenticationError } from "../../types";
 
-describe('Auth Utilities', () => {
+describe("Auth Utilities", () => {
   const mockUser: User = {
-    id: 'user-123',
-    google_id: '123456789',
-    email: 'test@example.com',
-    name: 'Test User',
-    avatar_url: 'https://example.com/avatar.jpg',
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
+    id: "user-123",
+    google_id: "123456789",
+    email: "test@example.com",
+    name: "Test User",
+    avatar_url: "https://example.com/avatar.jpg",
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
   };
 
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2024-01-01T12:00:00Z'));
+    vi.setSystemTime(new Date("2024-01-01T12:00:00Z"));
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  describe('createAuthSession', () => {
-    it('should create a valid auth session with default expiration', () => {
-      const session = createAuthSession(mockUser, 'token123');
-      
+  describe("createAuthSession", () => {
+    it("should create a valid auth session with default expiration", () => {
+      const session = createAuthSession(mockUser, "token123");
+
       expect(session.user).toEqual(mockUser);
-      expect(session.accessToken).toBe('token123');
-      expect(session.expiresAt).toBe('2024-01-01T13:00:00.000Z'); // 1 hour later
+      expect(session.accessToken).toBe("token123");
+      expect(session.expiresAt).toBe("2024-01-01T13:00:00.000Z"); // 1 hour later
     });
 
-    it('should create a session with custom expiration time', () => {
-      const session = createAuthSession(mockUser, 'token123', 7200); // 2 hours
-      
-      expect(session.expiresAt).toBe('2024-01-01T14:00:00.000Z'); // 2 hours later
+    it("should create a session with custom expiration time", () => {
+      const session = createAuthSession(mockUser, "token123", 7200); // 2 hours
+
+      expect(session.expiresAt).toBe("2024-01-01T14:00:00.000Z"); // 2 hours later
     });
   });
 
-  describe('isSessionValid', () => {
-    it('should return true for valid session', () => {
-      const session = createAuthSession(mockUser, 'token123');
+  describe("isSessionValid", () => {
+    it("should return true for valid session", () => {
+      const session = createAuthSession(mockUser, "token123");
       expect(isSessionValid(session)).toBe(true);
     });
 
-    it('should return false for expired session', () => {
-      const session = createAuthSession(mockUser, 'token123', -3600); // Expired 1 hour ago
+    it("should return false for expired session", () => {
+      const session = createAuthSession(mockUser, "token123", -3600); // Expired 1 hour ago
       expect(isSessionValid(session)).toBe(false);
     });
 
-    it('should return false for session without expiresAt', () => {
-      const session = { user: mockUser, accessToken: 'token123' } as AuthSession;
+    it("should return false for session without expiresAt", () => {
+      const session = { user: mockUser, accessToken: "token123" } as AuthSession;
       expect(isSessionValid(session)).toBe(false);
     });
 
-    it('should return false for null session', () => {
+    it("should return false for null session", () => {
       expect(isSessionValid(null as any)).toBe(false);
     });
   });
 
-  describe('isSessionExpired', () => {
-    it('should return false for valid session', () => {
-      const session = createAuthSession(mockUser, 'token123');
+  describe("isSessionExpired", () => {
+    it("should return false for valid session", () => {
+      const session = createAuthSession(mockUser, "token123");
       expect(isSessionExpired(session)).toBe(false);
     });
 
-    it('should return true for expired session', () => {
-      const session = createAuthSession(mockUser, 'token123', -3600);
+    it("should return true for expired session", () => {
+      const session = createAuthSession(mockUser, "token123", -3600);
       expect(isSessionExpired(session)).toBe(true);
     });
   });
 
-  describe('getSessionTimeRemaining', () => {
-    it('should return correct remaining time for valid session', () => {
-      const session = createAuthSession(mockUser, 'token123', 1800); // 30 minutes
+  describe("getSessionTimeRemaining", () => {
+    it("should return correct remaining time for valid session", () => {
+      const session = createAuthSession(mockUser, "token123", 1800); // 30 minutes
       expect(getSessionTimeRemaining(session)).toBe(1800);
     });
 
-    it('should return 0 for expired session', () => {
-      const session = createAuthSession(mockUser, 'token123', -3600);
+    it("should return 0 for expired session", () => {
+      const session = createAuthSession(mockUser, "token123", -3600);
       expect(getSessionTimeRemaining(session)).toBe(0);
     });
 
-    it('should return 0 for session without expiresAt', () => {
-      const session = { user: mockUser, accessToken: 'token123' } as AuthSession;
+    it("should return 0 for session without expiresAt", () => {
+      const session = { user: mockUser, accessToken: "token123" } as AuthSession;
       expect(getSessionTimeRemaining(session)).toBe(0);
     });
   });
 
-  describe('validateUser', () => {
-    it('should return true for valid user', () => {
+  describe("validateUser", () => {
+    it("should return true for valid user", () => {
       expect(validateUser(mockUser)).toBe(true);
     });
 
-    it('should return false for null user', () => {
+    it("should return false for null user", () => {
       expect(validateUser(null)).toBe(false);
     });
 
-    it('should return false for user missing required fields', () => {
+    it("should return false for user missing required fields", () => {
       const invalidUser = { ...mockUser };
       delete (invalidUser as any).email;
       expect(validateUser(invalidUser)).toBe(false);
     });
 
-    it('should return false for user with empty required fields', () => {
-      const invalidUser = { ...mockUser, name: '' };
+    it("should return false for user with empty required fields", () => {
+      const invalidUser = { ...mockUser, name: "" };
       expect(validateUser(invalidUser)).toBe(false);
     });
 
-    it('should return false for non-object input', () => {
-      expect(validateUser('not an object')).toBe(false);
+    it("should return false for non-object input", () => {
+      expect(validateUser("not an object")).toBe(false);
     });
   });
 
-  describe('requireValidSession', () => {
-    it('should return user for valid session', () => {
-      const session = createAuthSession(mockUser, 'token123');
+  describe("requireValidSession", () => {
+    it("should return user for valid session", () => {
+      const session = createAuthSession(mockUser, "token123");
       const user = requireValidSession(session);
       expect(user).toEqual(mockUser);
     });
 
-    it('should throw AuthenticationError for null session', () => {
+    it("should throw AuthenticationError for null session", () => {
       expect(() => requireValidSession(null)).toThrow(AuthenticationError);
-      expect(() => requireValidSession(null)).toThrow('No session provided');
+      expect(() => requireValidSession(null)).toThrow("No session provided");
     });
 
-    it('should throw AuthenticationError for expired session', () => {
-      const session = createAuthSession(mockUser, 'token123', -3600);
+    it("should throw AuthenticationError for expired session", () => {
+      const session = createAuthSession(mockUser, "token123", -3600);
       expect(() => requireValidSession(session)).toThrow(AuthenticationError);
-      expect(() => requireValidSession(session)).toThrow('Session has expired');
+      expect(() => requireValidSession(session)).toThrow("Session has expired");
     });
 
-    it('should throw AuthenticationError for invalid user data', () => {
-      const session = createAuthSession({ ...mockUser, email: '' }, 'token123');
+    it("should throw AuthenticationError for invalid user data", () => {
+      const session = createAuthSession({ ...mockUser, email: "" }, "token123");
       expect(() => requireValidSession(session)).toThrow(AuthenticationError);
-      expect(() => requireValidSession(session)).toThrow('Invalid user data in session');
+      expect(() => requireValidSession(session)).toThrow("Invalid user data in session");
     });
   });
 
-  describe('getUserFromSession', () => {
-    it('should return user for valid session', () => {
-      const session = createAuthSession(mockUser, 'token123');
+  describe("getUserFromSession", () => {
+    it("should return user for valid session", () => {
+      const session = createAuthSession(mockUser, "token123");
       const user = getUserFromSession(session);
       expect(user).toEqual(mockUser);
     });
 
-    it('should return null for invalid session', () => {
+    it("should return null for invalid session", () => {
       const user = getUserFromSession(null);
       expect(user).toBeNull();
     });
 
-    it('should return null for expired session', () => {
-      const session = createAuthSession(mockUser, 'token123', -3600);
+    it("should return null for expired session", () => {
+      const session = createAuthSession(mockUser, "token123", -3600);
       const user = getUserFromSession(session);
       expect(user).toBeNull();
     });
   });
 
-  describe('getSessionCookieOptions', () => {
-    it('should return development cookie options', () => {
+  describe("getSessionCookieOptions", () => {
+    it("should return development cookie options", () => {
       const options = getSessionCookieOptions(false);
       expect(options).toEqual({
         httpOnly: true,
         secure: false,
-        sameSite: 'lax',
+        sameSite: "lax",
         maxAge: 3600,
-        path: '/',
+        path: "/",
       });
     });
 
-    it('should return production cookie options', () => {
+    it("should return production cookie options", () => {
       const options = getSessionCookieOptions(true);
       expect(options).toEqual({
         httpOnly: true,
         secure: true,
-        sameSite: 'lax',
+        sameSite: "lax",
         maxAge: 3600,
-        path: '/',
+        path: "/",
       });
     });
   });
 
-  describe('generateSessionToken', () => {
-    it('should generate a non-empty token', () => {
+  describe("generateSessionToken", () => {
+    it("should generate a non-empty token", () => {
       const token = generateSessionToken();
       expect(token).toBeTruthy();
-      expect(typeof token).toBe('string');
+      expect(typeof token).toBe("string");
       expect(token.length).toBeGreaterThan(0);
     });
 
-    it('should generate unique tokens', () => {
+    it("should generate unique tokens", () => {
       const token1 = generateSessionToken();
       const token2 = generateSessionToken();
       expect(token1).not.toBe(token2);
     });
   });
 
-  describe('parseSessionFromCookie', () => {
-    it('should parse valid session from cookie', () => {
-      const session = createAuthSession(mockUser, 'token', 3600);
+  describe("parseSessionFromCookie", () => {
+    it("should parse valid session from cookie", () => {
+      const session = createAuthSession(mockUser, "token", 3600);
       const cookieValue = JSON.stringify(session);
-      
+
       const result = parseSessionFromCookie(cookieValue);
-      
+
       expect(result).toEqual(session);
     });
 
-    it('should return null for invalid JSON', () => {
-      const result = parseSessionFromCookie('invalid-json');
+    it("should return null for invalid JSON", () => {
+      const result = parseSessionFromCookie("invalid-json");
       expect(result).toBeNull();
     });
 
-    it('should return null for expired session', () => {
-      const expiredSession = createAuthSession(mockUser, 'token', -1);
+    it("should return null for expired session", () => {
+      const expiredSession = createAuthSession(mockUser, "token", -1);
       const cookieValue = JSON.stringify(expiredSession);
-      
+
       const result = parseSessionFromCookie(cookieValue);
       expect(result).toBeNull();
     });
   });
 
-  describe('serializeSessionToCookie', () => {
-    it('should serialize session to cookie string', () => {
-      const session = createAuthSession(mockUser, 'token', 3600);
-      
+  describe("serializeSessionToCookie", () => {
+    it("should serialize session to cookie string", () => {
+      const session = createAuthSession(mockUser, "token", 3600);
+
       const result = serializeSessionToCookie(session, false);
-      
+
       expect(result).toContain(`session=${JSON.stringify(session)}`);
-      expect(result).toContain('HttpOnly');
-      expect(result).toContain('SameSite=lax');
-      expect(result).toContain('Max-Age=3600');
-      expect(result).toContain('Path=/');
-      expect(result).not.toContain('Secure');
+      expect(result).toContain("HttpOnly");
+      expect(result).toContain("SameSite=lax");
+      expect(result).toContain("Max-Age=3600");
+      expect(result).toContain("Path=/");
+      expect(result).not.toContain("Secure");
     });
 
-    it('should include Secure flag in production', () => {
-      const session = createAuthSession(mockUser, 'token', 3600);
-      
+    it("should include Secure flag in production", () => {
+      const session = createAuthSession(mockUser, "token", 3600);
+
       const result = serializeSessionToCookie(session, true);
-      
-      expect(result).toContain('Secure');
+
+      expect(result).toContain("Secure");
     });
   });
 
-  describe('createClearSessionCookie', () => {
-    it('should create cookie string that clears session', () => {
+  describe("createClearSessionCookie", () => {
+    it("should create cookie string that clears session", () => {
       const result = createClearSessionCookie();
-      
-      expect(result).toBe('session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax');
+
+      expect(result).toBe("session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax");
     });
   });
 });

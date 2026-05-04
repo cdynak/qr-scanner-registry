@@ -1,8 +1,124 @@
 ---
-import Welcome from "../components/Welcome.astro";
-import Layout from "../layouts/Layout.astro";
+import MainLayout from "../layouts/MainLayout.astro";
+import { AuthGuard } from "../components/AuthGuard";
+import { LoginButton } from "../components/LoginButton";
 ---
 
-<Layout>
-  <Welcome />
-</Layout>
+<MainLayout title="QR Scanner Registry - Home">
+  <div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+      <!-- Hero Section -->
+      <div class="text-center mb-12">
+        <h1 class="text-4xl font-bold text-foreground mb-4">QR Scanner Registry</h1>
+        <p class="text-xl text-muted-foreground mb-8">
+          Scan QR codes and barcodes with your camera and store them securely in the cloud
+        </p>
+      </div>
+
+      <!-- Authentication Check -->
+      <AuthGuard client:load>
+        <!-- Authenticated User Content -->
+        <div class="space-y-8">
+          <div class="grid md:grid-cols-2 gap-6">
+            <!-- Scanner Access Card -->
+            <div class="bg-card rounded-lg border p-6 shadow-sm">
+              <div class="flex items-center space-x-4 mb-4">
+                <div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h2M4 4h4m0 0V2m0 2h2m0 0v2m0 0h2m0 0v2M4 4v4m0 0h2m0 0v2"
+                    ></path>
+                  </svg>
+                </div>
+                <div>
+                  <h2 class="text-xl font-semibold">Start Scanning</h2>
+                  <p class="text-muted-foreground">Use your camera to scan QR codes and barcodes</p>
+                </div>
+              </div>
+              <a
+                href="/scanner"
+                class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 w-full"
+              >
+                Open Scanner
+              </a>
+            </div>
+
+            <!-- Scan History Card -->
+            <div class="bg-card rounded-lg border p-6 shadow-sm">
+              <div class="flex items-center space-x-4 mb-4">
+                <div class="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
+                  <svg class="w-6 h-6 text-secondary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                    ></path>
+                  </svg>
+                </div>
+                <div>
+                  <h2 class="text-xl font-semibold">Scan History</h2>
+                  <p class="text-muted-foreground">View and manage your previous scans</p>
+                </div>
+              </div>
+              <a
+                href="/history"
+                class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 w-full"
+              >
+                View History
+              </a>
+            </div>
+          </div>
+
+          <!-- Features Section -->
+          <div class="bg-muted/50 rounded-lg p-6">
+            <h3 class="text-lg font-semibold mb-4">Features</h3>
+            <div class="grid md:grid-cols-3 gap-4">
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="font-medium">Secure Storage</h4>
+                  <p class="text-sm text-muted-foreground">Your scans are securely stored in the cloud</p>
+                </div>
+              </div>
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"
+                    ></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="font-medium">Fast Scanning</h4>
+                  <p class="text-sm text-muted-foreground">Quick and accurate QR code and barcode detection</p>
+                </div>
+              </div>
+              <div class="flex items-start space-x-3">
+                <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h4 class="font-medium">Mobile Friendly</h4>
+                  <p class="text-sm text-muted-foreground">Works perfectly on mobile devices</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </AuthGuard>
+    </div>
+  </div>
+</MainLayout>

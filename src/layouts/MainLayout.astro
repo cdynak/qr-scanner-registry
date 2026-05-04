@@ -1,0 +1,61 @@
+---
+import "../styles/global.css";
+import Navigation from "../components/Navigation";
+import ErrorBoundary from "../components/ErrorBoundary";
+
+interface Props {
+  title?: string;
+  showNavigation?: boolean;
+}
+
+const { title = "QR Scanner Registry", showNavigation = true } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-screen bg-background font-sans antialiased">
+    <ErrorBoundary client:load>
+      <div class="relative flex min-h-screen flex-col">
+        {
+          showNavigation && (
+            <header class="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+              <Navigation client:load />
+            </header>
+          )
+        }
+
+        <main class="flex-1">
+          <slot />
+        </main>
+
+        <footer class="border-t py-6 md:py-0">
+          <div class="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
+            <div class="flex flex-col items-center gap-4 px-8 md:flex-row md:gap-2 md:px-0">
+              <p class="text-center text-sm leading-loose text-muted-foreground md:text-left">
+                Built with Astro, React, and Supabase.
+              </p>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </ErrorBoundary>
+  </body>
+</html>
+
+<style>
+  html {
+    font-family: system-ui, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+  }
+</style>

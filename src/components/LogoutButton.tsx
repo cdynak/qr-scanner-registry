@@ -1,24 +1,24 @@
-import React, { useState } from 'react';
-import { Button } from './ui/button';
+import React, { useState } from "react";
+import { Button } from "./ui/button";
 
 interface LogoutButtonProps {
   className?: string;
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  size?: "default" | "sm" | "lg" | "icon";
   children?: React.ReactNode;
   onLogoutStart?: () => void;
   onLogoutComplete?: () => void;
   onLogoutError?: (error: Error) => void;
 }
 
-export function LogoutButton({ 
+export function LogoutButton({
   className,
-  variant = 'outline',
-  size = 'default',
-  children = 'Logout',
+  variant = "outline",
+  size = "default",
+  children = "Logout",
   onLogoutStart,
   onLogoutComplete,
-  onLogoutError
+  onLogoutError,
 }: LogoutButtonProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -29,12 +29,12 @@ export function LogoutButton({
       setIsLoggingOut(true);
       onLogoutStart?.();
 
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        credentials: 'include', // Include cookies
+        credentials: "include", // Include cookies
       });
 
       if (!response.ok) {
@@ -44,14 +44,14 @@ export function LogoutButton({
 
       // Clear any client-side auth state
       // The server should have cleared the session cookie
-      
+
       onLogoutComplete?.();
-      
+
       // Redirect to home page or login page
-      window.location.href = '/';
+      window.location.href = "/";
     } catch (error) {
-      console.error('Logout failed:', error);
-      const logoutError = error instanceof Error ? error : new Error('Logout failed');
+      console.error("Logout failed:", error);
+      const logoutError = error instanceof Error ? error : new Error("Logout failed");
       onLogoutError?.(logoutError);
     } finally {
       setIsLoggingOut(false);
@@ -59,13 +59,7 @@ export function LogoutButton({
   };
 
   return (
-    <Button
-      onClick={handleLogout}
-      disabled={isLoggingOut}
-      className={className}
-      variant={variant}
-      size={size}
-    >
+    <Button onClick={handleLogout} disabled={isLoggingOut} className={className} variant={variant} size={size}>
       {isLoggingOut ? (
         <>
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
@@ -73,13 +67,7 @@ export function LogoutButton({
         </>
       ) : (
         <>
-          <svg
-            className="w-4 h-4 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"

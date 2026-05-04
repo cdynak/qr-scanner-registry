@@ -1,14 +1,18 @@
-import { beforeAll, afterEach, afterAll, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
-import '@testing-library/jest-dom/vitest';
+import { beforeAll, afterEach, afterAll, vi } from "vitest";
+import { cleanup } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 
 // Mock environment variables for testing
 beforeAll(() => {
-  process.env.SUPABASE_URL = 'https://test-project.supabase.co';
-  process.env.SUPABASE_ANON_KEY = 'test-anon-key';
-  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
-  process.env.GOOGLE_CLIENT_ID = 'test-google-client-id';
-  process.env.GOOGLE_CLIENT_SECRET = 'test-google-client-secret';
+  process.env.SUPABASE_URL = "https://test-project.supabase.co";
+  process.env.SUPABASE_ANON_KEY = "test-anon-key";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+  process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
+  process.env.GOOGLE_CLIENT_SECRET = "test-google-client-secret";
+  process.env.NODE_ENV = "test";
+  
+  // Disable CSRF protection in tests
+  process.env.DISABLE_CSRF_IN_TESTS = "true";
 });
 
 // Cleanup after each test case
@@ -22,13 +26,13 @@ afterAll(() => {
 });
 
 // Mock camera API for testing
-Object.defineProperty(global.navigator, 'mediaDevices', {
+Object.defineProperty(global.navigator, "mediaDevices", {
   writable: true,
   value: {
     getUserMedia: vi.fn().mockResolvedValue({
-      getTracks: () => [{ stop: vi.fn() }]
-    })
-  }
+      getTracks: () => [{ stop: vi.fn() }],
+    }),
+  },
 });
 
 // Mock Google OAuth
@@ -37,7 +41,7 @@ global.google = {
     id: {
       initialize: vi.fn(),
       renderButton: vi.fn(),
-      prompt: vi.fn()
-    }
-  }
+      prompt: vi.fn(),
+    },
+  },
 } as any;

@@ -1,6 +1,9 @@
 # build output
 dist/
 
+# test results
+test-results/
+
 # generated types
 .astro/
 

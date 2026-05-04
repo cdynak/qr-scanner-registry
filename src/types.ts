@@ -1,15 +1,15 @@
 // Re-export database types for convenience
-export type { User, UserInsert, UserUpdate, Scan, ScanInsert, ScanUpdate, ScanType } from './db/types';
+export type { User, UserInsert, UserUpdate, Scan, ScanInsert, ScanUpdate, ScanType } from "./db/types";
 
 // Re-export utility functions and error types
-export * from './lib/auth';
-export * from './lib/validation';
-export * from './lib/errors';
+export * from "./lib/auth";
+export * from "./lib/validation";
+export * from "./lib/errors";
 
 // Additional application-specific types
 export interface ScanCreateRequest {
   content: string;
-  scanType: 'qr' | 'barcode';
+  scanType: "qr" | "barcode";
   format?: string;
 }
 
@@ -20,7 +20,7 @@ export interface AuthSession {
 }
 
 export interface ScanHistoryFilters {
-  scanType?: 'qr' | 'barcode';
+  scanType?: "qr" | "barcode";
   startDate?: string;
   endDate?: string;
   limit?: number;
@@ -44,22 +44,28 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 // Error types
 export class DatabaseError extends Error {
-  constructor(message: string, public cause?: unknown) {
+  constructor(
+    message: string,
+    public cause?: unknown
+  ) {
     super(message);
-    this.name = 'DatabaseError';
+    this.name = "DatabaseError";
   }
 }
 
 export class AuthenticationError extends Error {
-  constructor(message: string = 'Authentication required') {
+  constructor(message = "Authentication required") {
     super(message);
-    this.name = 'AuthenticationError';
+    this.name = "AuthenticationError";
   }
 }
 
 export class ValidationError extends Error {
-  constructor(message: string, public field?: string) {
+  constructor(
+    message: string,
+    public field?: string
+  ) {
     super(message);
-    this.name = 'ValidationError';
+    this.name = "ValidationError";
   }
 }

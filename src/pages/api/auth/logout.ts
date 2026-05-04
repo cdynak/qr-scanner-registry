@@ -1,4 +1,4 @@
-import type { APIRoute } from 'astro';
+import type { APIRoute } from "astro";
 
 /**
  * Handles user logout by clearing the session cookie
@@ -7,25 +7,25 @@ import type { APIRoute } from 'astro';
 export const POST: APIRoute = async ({ redirect }) => {
   try {
     // Create response with redirect
-    const response = redirect('/?logout=success');
-    
+    const response = redirect("/?logout=success");
+
     // Clear the session cookie by setting it to expire immediately
     response.headers.set(
-      'Set-Cookie',
-      'session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax'
+      "Set-Cookie",
+      "session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax"
     );
 
     return response;
   } catch (error) {
-    console.error('Logout error:', error);
-    
+    console.error("Logout error:", error);
+
     // Even if there's an error, we should still clear the cookie and redirect
-    const response = redirect('/?error=logout_failed');
+    const response = redirect("/?error=logout_failed");
     response.headers.set(
-      'Set-Cookie',
-      'session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax'
+      "Set-Cookie",
+      "session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax"
     );
-    
+
     return response;
   }
 };
@@ -35,5 +35,5 @@ export const POST: APIRoute = async ({ redirect }) => {
  */
 export const GET: APIRoute = async ({ redirect }) => {
   // Redirect GET requests to use POST method
-  return redirect('/', 302);
+  return redirect("/", 302);
 };

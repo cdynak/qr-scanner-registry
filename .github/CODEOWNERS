@@ -1,0 +1,20 @@
+# Global code owners
+* @your-username
+
+# CI/CD workflows require additional review
+/.github/workflows/ @your-username @team-lead
+
+# Database migrations require database team review
+/src/db/migrations/ @your-username @database-team
+
+# Security-related files require security team review
+/src/lib/auth.ts @your-username @security-team
+/src/middleware/ @your-username @security-team
+/src/pages/api/auth/ @your-username @security-team
+
+# E2E tests require QA team review
+/e2e/ @your-username @qa-team
+
+# Package.json changes require team lead approval
+/package.json @your-username @team-lead
+/package-lock.json @your-username @team-lead

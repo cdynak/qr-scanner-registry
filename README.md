@@ -1,6 +1,10 @@
-# 10x Astro Starter
+# QR Scanner Registry
 
-A modern, opinionated starter template for building fast, accessible, and AI-friendly web applications.
+[![CI](https://github.com/your-username/qr-scanner-registry/workflows/CI/badge.svg)](https://github.com/your-username/qr-scanner-registry/actions/workflows/ci.yml)
+[![Main Branch](https://github.com/your-username/qr-scanner-registry/workflows/Main%20Branch%20CI%2FCD/badge.svg)](https://github.com/your-username/qr-scanner-registry/actions/workflows/main.yml)
+[![codecov](https://codecov.io/gh/your-username/qr-scanner-registry/branch/main/graph/badge.svg)](https://codecov.io/gh/your-username/qr-scanner-registry)
+
+A modern web application that allows users to authenticate with Google, scan QR codes and barcodes using their device camera, and store scan results in a database.
 
 ## Tech Stack
 
@@ -55,6 +59,52 @@ npm run build
 - `npm run e2e` - Run end-to-end tests
 - `npm run e2e:ui` - Run end-to-end tests with UI
 - `npm run e2e:debug` - Run end-to-end tests in debug mode
+- `npm run e2e:infrastructure` - Run infrastructure E2E tests
+- `npm run e2e:auth` - Run authentication E2E tests
+- `npm run e2e:scanner` - Run scanner E2E tests
+- `npm run e2e:history` - Run scan history E2E tests
+- `npm run e2e:workflow` - Run user workflow E2E tests
+- `npm run e2e:smoke` - Run smoke E2E tests
+- `npm run e2e:cross-browser` - Run cross-browser E2E tests
+- `npm run e2e:mobile` - Run mobile E2E tests
+
+## CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+### Workflows
+
+- **CI (`ci.yml`)** - Runs on every push and pull request
+  - Linting and code formatting checks
+  - Unit tests with coverage reporting
+  - Build verification
+  - E2E smoke tests for PRs
+  - Security audit
+
+- **Pull Request Checks (`pr-checks.yml`)** - Validates PRs before merge
+  - Comprehensive validation including merge conflict detection
+  - Coverage threshold enforcement (80% minimum)
+  - Automated PR comments with test results
+  - Blocks merging on test failures
+
+- **Main Branch (`main.yml`)** - Runs on main branch updates
+  - Full test suite including comprehensive E2E tests
+  - Cross-browser testing
+  - Test result artifacts with 30-day retention
+  - Failure notifications
+
+- **Nightly (`nightly.yml`)** - Scheduled comprehensive testing
+  - Multi-version Node.js testing (20.x, 22.x, 22.18.0)
+  - Cross-browser E2E testing
+  - Performance testing with Lighthouse
+  - Security scanning
+
+### Test Coverage
+
+The project maintains a minimum of 80% test coverage across:
+- Unit tests for all components and utilities
+- Integration tests for API endpoints
+- End-to-end tests for complete user workflows
 
 ## Project Structure
 

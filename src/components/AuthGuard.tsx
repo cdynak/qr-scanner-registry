@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import type { AuthSession, User } from '../types';
-import { LoginButton } from './LoginButton';
-import { getUserFromSession, parseSessionFromCookie } from '../lib/auth';
+import React, { useEffect, useState } from "react";
+import type { AuthSession, User } from "../types";
+import { LoginButton } from "./LoginButton";
+import { getUserFromSession, parseSessionFromCookie } from "../lib/auth";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -16,46 +16,62 @@ interface AuthState {
   error: string | null;
 }
 
-export function AuthGuard({ 
-  children, 
-  fallback,
-  redirectTo,
-  requireAuth = true 
-}: AuthGuardProps) {
+export function AuthGuard({ children, fallback, redirectTo, requireAuth = true }: AuthGuardProps) {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     loading: true,
-    error: null
+    error: null,
   });
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         // Get session from cookie
-        const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-          const [key, value] = cookie.trim().split('=');
-          acc[key] = value;
-          return acc;
-        }, {} as Record<string, string>);
+        const cookies = document.cookie.split(";").reduce(
+          (acc, cookie) => {
+            const [key, value] = cookie.trim().split("=");
+            acc[key] = value;
+            return acc;
+          },
+          {} as Record<string, string>
+        );
 
         const sessionCookie = cookies.session;
-        
+
+        console.log("Debug - Available cookies:", Object.keys(cookies));
+        console.log("Debug - Session cookie exists:", !!sessionCookie);
+        console.log("Debug - Raw session cookie:", sessionCookie?.substring(0, 100) + "...");
+
         if (!sessionCookie) {
           setAuthState({ user: null, loading: false, error: null });
           return;
         }
 
+        // Try to decode the session cookie
+        let decodedCookie;
+        try {
+          decodedCookie = decodeURIComponent(sessionCookie);
+          console.log("Debug - Decoded cookie:", decodedCookie.substring(0, 100) + "...");
+        } catch (error) {
+          console.error("Debug - Failed to decode cookie:", error);
+          setAuthState({ user: null, loading: false, error: "Failed to decode session cookie" });
+          return;
+        }
+
         // Parse and validate session
-        const session = parseSessionFromCookie(decodeURIComponent(sessionCookie));
+        const session = parseSessionFromCookie(decodedCookie);
+        console.log("Debug - Parsed session:", session);
+
         const user = getUserFromSession(session);
+        console.log("Debug - Parsed user:", user);
 
         setAuthState({ user, loading: false, error: null });
       } catch (error) {
-        console.error('Auth check failed:', error);
-        setAuthState({ 
-          user: null, 
-          loading: false, 
-          error: error instanceof Error ? error.message : 'Authentication failed' 
+        console.error("Auth check failed:", error);
+        setAuthState({
+          user: null,
+          loading: false,
+          error: error instanceof Error ? error.message : "Authentication failed",
         });
       }
     };
@@ -102,9 +118,7 @@ export function AuthGuard({
       <div className="flex flex-col items-center justify-center min-h-[200px] gap-4">
         <div className="text-center">
           <h3 className="font-medium">Authentication Required</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Please log in to access this content.
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Please log in to access this content.</p>
         </div>
         <LoginButton />
       </div>
@@ -120,20 +134,23 @@ export function useAuth(): AuthState & { isAuthenticated: boolean } {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     loading: true,
-    error: null
+    error: null,
   });
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-          const [key, value] = cookie.trim().split('=');
-          acc[key] = value;
-          return acc;
-        }, {} as Record<string, string>);
+        const cookies = document.cookie.split(";").reduce(
+          (acc, cookie) => {
+            const [key, value] = cookie.trim().split("=");
+            acc[key] = value;
+            return acc;
+          },
+          {} as Record<string, string>
+        );
 
         const sessionCookie = cookies.session;
-        
+
         if (!sessionCookie) {
           setAuthState({ user: null, loading: false, error: null });
           return;
@@ -144,11 +161,10 @@ export function useAuth(): AuthState & { isAuthenticated: boolean } {
 
         setAuthState({ user, loading: false, error: null });
       } catch (error) {
-        console.error('Auth check failed:', error);
-        setAuthState({ 
-          user: null, 
-          loading: false, 
-          error: error instanceof Error ? error.message : 'Authentication failed' 
+        setAuthState({
+          user: null,
+          loading: false,
+          error: error instanceof Error ? error.message : "Authentication failed",
         });
       }
     };
@@ -158,6 +174,6 @@ export function useAuth(): AuthState & { isAuthenticated: boolean } {
 
   return {
     ...authState,
-    isAuthenticated: !!authState.user
+    isAuthenticated: !!authState.user,
   };
 }

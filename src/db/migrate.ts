@@ -1,6 +1,6 @@
-import { createServerSupabaseClient } from './supabase';
-import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { createServerSupabaseClient } from "./supabase";
+import { readFile } from "fs/promises";
+import { join } from "path";
 
 interface Migration {
   id: string;
@@ -9,25 +9,21 @@ interface Migration {
 }
 
 // List of migration files in order
-const MIGRATION_FILES = [
-  '001_create_users_table.sql',
-  '002_create_scans_table.sql',
-  '003_enable_rls_policies.sql',
-];
+const MIGRATION_FILES = ["001_create_users_table.sql", "002_create_scans_table.sql", "003_enable_rls_policies.sql"];
 
 /**
  * Load migration files from the migrations directory
  */
 async function loadMigrations(): Promise<Migration[]> {
   const migrations: Migration[] = [];
-  
+
   for (const filename of MIGRATION_FILES) {
     try {
-      const filePath = join(process.cwd(), 'src', 'db', 'migrations', filename);
-      const sql = await readFile(filePath, 'utf-8');
-      
+      const filePath = join(process.cwd(), "src", "db", "migrations", filename);
+      const sql = await readFile(filePath, "utf-8");
+
       migrations.push({
-        id: filename.split('_')[0], // Extract migration ID (e.g., '001')
+        id: filename.split("_")[0], // Extract migration ID (e.g., '001')
         filename,
         sql: sql.trim(),
       });
@@ -36,7 +32,7 @@ async function loadMigrations(): Promise<Migration[]> {
       throw error;
     }
   }
-  
+
   return migrations;
 }
 
@@ -45,19 +41,19 @@ async function loadMigrations(): Promise<Migration[]> {
  */
 async function createMigrationsTable() {
   const supabase = createServerSupabaseClient();
-  
-  const { error } = await supabase.rpc('exec_sql', {
+
+  const { error } = await supabase.rpc("exec_sql", {
     sql: `
       CREATE TABLE IF NOT EXISTS migrations (
         id VARCHAR PRIMARY KEY,
         filename VARCHAR NOT NULL,
         executed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
-    `
+    `,
   });
-  
+
   if (error) {
-    console.error('Failed to create migrations table:', error);
+    console.error("Failed to create migrations table:", error);
     throw error;
   }
 }
@@ -67,18 +63,15 @@ async function createMigrationsTable() {
  */
 async function getExecutedMigrations(): Promise<string[]> {
   const supabase = createServerSupabaseClient();
-  
-  const { data, error } = await supabase
-    .from('migrations')
-    .select('id')
-    .order('id');
-  
+
+  const { data, error } = await supabase.from("migrations").select("id").order("id");
+
   if (error) {
-    console.error('Failed to get executed migrations:', error);
+    console.error("Failed to get executed migrations:", error);
     throw error;
   }
-  
-  return data?.map(row => row.id) || [];
+
+  return data?.map((row) => row.id) || [];
 }
 
 /**
@@ -86,32 +79,30 @@ async function getExecutedMigrations(): Promise<string[]> {
  */
 async function executeMigration(migration: Migration): Promise<void> {
   const supabase = createServerSupabaseClient();
-  
+
   console.log(`Executing migration ${migration.id}: ${migration.filename}`);
-  
+
   // Execute the migration SQL
-  const { error: sqlError } = await supabase.rpc('exec_sql', {
-    sql: migration.sql
+  const { error: sqlError } = await supabase.rpc("exec_sql", {
+    sql: migration.sql,
   });
-  
+
   if (sqlError) {
     console.error(`Failed to execute migration ${migration.id}:`, sqlError);
     throw sqlError;
   }
-  
+
   // Record the migration as executed
-  const { error: recordError } = await supabase
-    .from('migrations')
-    .insert({
-      id: migration.id,
-      filename: migration.filename,
-    });
-  
+  const { error: recordError } = await supabase.from("migrations").insert({
+    id: migration.id,
+    filename: migration.filename,
+  });
+
   if (recordError) {
     console.error(`Failed to record migration ${migration.id}:`, recordError);
     throw recordError;
   }
-  
+
   console.log(`✅ Migration ${migration.id} executed successfully`);
 }
 
@@ -120,40 +111,37 @@ async function executeMigration(migration: Migration): Promise<void> {
  */
 export async function runMigrations(): Promise<void> {
   try {
-    console.log('🚀 Starting database migrations...');
-    
+    console.log("🚀 Starting database migrations...");
+
     // Create migrations tracking table
     await createMigrationsTable();
-    
+
     // Load all migrations
     const migrations = await loadMigrations();
     console.log(`Found ${migrations.length} migration files`);
-    
+
     // Get executed migrations
     const executedMigrations = await getExecutedMigrations();
     console.log(`${executedMigrations.length} migrations already executed`);
-    
+
     // Filter pending migrations
-    const pendingMigrations = migrations.filter(
-      migration => !executedMigrations.includes(migration.id)
-    );
-    
+    const pendingMigrations = migrations.filter((migration) => !executedMigrations.includes(migration.id));
+
     if (pendingMigrations.length === 0) {
-      console.log('✅ No pending migrations');
+      console.log("✅ No pending migrations");
       return;
     }
-    
+
     console.log(`Running ${pendingMigrations.length} pending migrations...`);
-    
+
     // Execute pending migrations
     for (const migration of pendingMigrations) {
       await executeMigration(migration);
     }
-    
-    console.log('🎉 All migrations completed successfully!');
-    
+
+    console.log("🎉 All migrations completed successfully!");
   } catch (error) {
-    console.error('❌ Migration failed:', error);
+    console.error("❌ Migration failed:", error);
     throw error;
   }
 }

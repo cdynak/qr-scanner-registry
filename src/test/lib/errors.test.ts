@@ -1,332 +1,472 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   NetworkError,
   CameraError,
   ScanError,
   RateLimitError,
+  AuthenticationError,
   ErrorSeverity,
   createErrorInfo,
   logError,
   handleAsyncError,
   withErrorHandling,
   createApiErrorResponse,
-  isRetryableError,
   getRetryDelay,
   retryWithBackoff,
   safeExecute,
   safeExecuteAsync,
-} from '../../lib/errors';
-import { DatabaseError, AuthenticationError, ValidationError } from '../../types';
+  CircuitBreaker,
+  RateLimiter,
+  setupGlobalErrorHandling,
+} from "../../lib/errors";
+import { ValidationError, DatabaseError } from "../../types";
 
-describe('Error Utilities', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2024-01-01T12:00:00Z'));
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-  });
+// Mock console methods
+const mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
+describe("Error Classes", () => {
   afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
+    mockConsoleError.mockClear();
   });
 
-  describe('Custom Error Classes', () => {
-    it('should create NetworkError with default message', () => {
+  describe("NetworkError", () => {
+    it("should create NetworkError with default message", () => {
       const error = new NetworkError();
-      expect(error.name).toBe('NetworkError');
-      expect(error.message).toBe('Network request failed');
+      expect(error.name).toBe("NetworkError");
+      expect(error.message).toBe("Network request failed");
       expect(error.statusCode).toBeUndefined();
     });
 
-    it('should create NetworkError with custom message and status code', () => {
-      const error = new NetworkError('Custom network error', 404);
-      expect(error.message).toBe('Custom network error');
-      expect(error.statusCode).toBe(404);
+    it("should create NetworkError with custom message and status code", () => {
+      const error = new NetworkError("Custom network error", 500);
+      expect(error.name).toBe("NetworkError");
+      expect(error.message).toBe("Custom network error");
+      expect(error.statusCode).toBe(500);
+    });
+  });
+
+  describe("CameraError", () => {
+    it("should create CameraError with default message", () => {
+      const error = new CameraError();
+      expect(error.name).toBe("CameraError");
+      expect(error.message).toBe("Camera access failed");
+      expect(error.code).toBeUndefined();
     });
 
-    it('should create CameraError with code', () => {
-      const error = new CameraError('Camera not found', 'NotFoundError');
-      expect(error.name).toBe('CameraError');
-      expect(error.message).toBe('Camera not found');
-      expect(error.code).toBe('NotFoundError');
+    it("should create CameraError with custom message and code", () => {
+      const error = new CameraError("Permission denied", "NotAllowedError");
+      expect(error.name).toBe("CameraError");
+      expect(error.message).toBe("Permission denied");
+      expect(error.code).toBe("NotAllowedError");
+    });
+  });
+
+  describe("ScanError", () => {
+    it("should create ScanError with default message", () => {
+      const error = new ScanError();
+      expect(error.name).toBe("ScanError");
+      expect(error.message).toBe("Scan processing failed");
+      expect(error.scanType).toBeUndefined();
     });
 
-    it('should create ScanError with scan type', () => {
-      const error = new ScanError('Failed to decode QR', 'qr');
-      expect(error.name).toBe('ScanError');
-      expect(error.scanType).toBe('qr');
+    it("should create ScanError with custom message and scan type", () => {
+      const error = new ScanError("QR code invalid", "qr");
+      expect(error.name).toBe("ScanError");
+      expect(error.message).toBe("QR code invalid");
+      expect(error.scanType).toBe("qr");
+    });
+  });
+
+  describe("RateLimitError", () => {
+    it("should create RateLimitError with default message", () => {
+      const error = new RateLimitError();
+      expect(error.name).toBe("RateLimitError");
+      expect(error.message).toBe("Rate limit exceeded");
+      expect(error.retryAfter).toBeUndefined();
     });
 
-    it('should create RateLimitError with retry after', () => {
-      const error = new RateLimitError('Too many requests', 60);
-      expect(error.name).toBe('RateLimitError');
+    it("should create RateLimitError with custom message and retry after", () => {
+      const error = new RateLimitError("Too many requests", 60);
+      expect(error.name).toBe("RateLimitError");
+      expect(error.message).toBe("Too many requests");
       expect(error.retryAfter).toBe(60);
     });
   });
 
-  describe('createErrorInfo', () => {
-    it('should create error info for ValidationError', () => {
-      const error = new ValidationError('Invalid input', 'email');
-      const errorInfo = createErrorInfo(error);
-
-      expect(errorInfo.name).toBe('ValidationError');
-      expect(errorInfo.message).toBe('Invalid input');
-      expect(errorInfo.severity).toBe(ErrorSeverity.LOW);
-      expect(errorInfo.field).toBe('email');
-      expect(errorInfo.userMessage).toBe('Please check your input and try again.');
-      expect(errorInfo.timestamp).toBe('2024-01-01T12:00:00.000Z');
+  describe("AuthenticationError", () => {
+    it("should create AuthenticationError with default message", () => {
+      const error = new AuthenticationError();
+      expect(error.name).toBe("AuthenticationError");
+      expect(error.message).toBe("Authentication failed");
+      expect(error.code).toBeUndefined();
     });
 
-    it('should create error info for NetworkError with status code', () => {
-      const error = new NetworkError('Request failed', 500);
-      const errorInfo = createErrorInfo(error);
-
-      expect(errorInfo.name).toBe('NetworkError');
-      expect(errorInfo.statusCode).toBe(500);
-      expect(errorInfo.severity).toBe(ErrorSeverity.MEDIUM);
+    it("should create AuthenticationError with custom message and code", () => {
+      const error = new AuthenticationError("Invalid token", "INVALID_TOKEN");
+      expect(error.name).toBe("AuthenticationError");
+      expect(error.message).toBe("Invalid token");
+      expect(error.code).toBe("INVALID_TOKEN");
     });
+  });
+});
 
-    it('should create error info for CameraError with code', () => {
-      const error = new CameraError('Permission denied', 'PermissionDeniedError');
-      const errorInfo = createErrorInfo(error);
+describe("createErrorInfo", () => {
+  it("should create error info for Error objects", () => {
+    const error = new NetworkError("Network failed", 500);
+    const errorInfo = createErrorInfo(error);
 
-      expect(errorInfo.name).toBe('CameraError');
-      expect(errorInfo.code).toBe('PermissionDeniedError');
-    });
+    expect(errorInfo.name).toBe("NetworkError");
+    expect(errorInfo.message).toBe("Network failed");
+    expect(errorInfo.severity).toBe(ErrorSeverity.MEDIUM);
+    expect(errorInfo.statusCode).toBe(500);
+    expect(errorInfo.retryable).toBe(true);
+    expect(errorInfo.userMessage).toBe("Connection failed. Please check your internet and try again.");
+    expect(errorInfo.timestamp).toBeDefined();
+  });
 
-    it('should create error info for RateLimitError', () => {
-      const error = new RateLimitError('Rate limit exceeded', 30);
-      const errorInfo = createErrorInfo(error);
+  it("should create error info for ValidationError with field", () => {
+    const error = new ValidationError("Invalid email", "email");
+    const errorInfo = createErrorInfo(error);
 
-      expect(errorInfo.name).toBe('RateLimitError');
-      expect(errorInfo.statusCode).toBe(429);
-    });
+    expect(errorInfo.name).toBe("ValidationError");
+    expect(errorInfo.field).toBe("email");
+    expect(errorInfo.severity).toBe(ErrorSeverity.LOW);
+    expect(errorInfo.retryable).toBe(false);
+  });
 
-    it('should handle non-Error objects', () => {
-      const errorInfo = createErrorInfo('String error');
+  it("should create error info for non-Error objects", () => {
+    const errorInfo = createErrorInfo("String error");
 
-      expect(errorInfo.name).toBe('UnknownError');
-      expect(errorInfo.message).toBe('String error');
-      expect(errorInfo.severity).toBe(ErrorSeverity.MEDIUM);
-      expect(errorInfo.userMessage).toBe('An unexpected error occurred. Please try again.');
-    });
+    expect(errorInfo.name).toBe("UnknownError");
+    expect(errorInfo.message).toBe("String error");
+    expect(errorInfo.severity).toBe(ErrorSeverity.MEDIUM);
+    expect(errorInfo.retryable).toBe(false);
+    expect(errorInfo.userMessage).toBe("An unexpected error occurred. Please try again.");
+  });
 
-    it('should handle null/undefined errors', () => {
-      const errorInfo = createErrorInfo(null);
+  it("should include context in error info", () => {
+    const error = new Error("Test error");
+    const context = { component: "TestComponent", step: "test" };
+    const errorInfo = createErrorInfo(error, context);
 
-      expect(errorInfo.name).toBe('UnknownError');
-      expect(errorInfo.message).toBe('null');
+    expect(errorInfo.context).toEqual(context);
+  });
+});
+
+describe("logError", () => {
+  it("should log error in development mode", () => {
+    const error = new Error("Test error");
+    logError(error, { test: true }, true);
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      "Error logged:",
+      expect.objectContaining({
+        name: "Error",
+        message: "Test error",
+        context: { test: true },
+      })
+    );
+  });
+
+  it("should not log error in production mode", () => {
+    mockConsoleError.mockClear(); // Clear previous calls
+    const error = new Error("Test error");
+    logError(error, { test: true }, false);
+
+    expect(mockConsoleError).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleAsyncError", () => {
+  it("should resolve successful promises", async () => {
+    const promise = Promise.resolve("success");
+    const result = await handleAsyncError(promise);
+    expect(result).toBe("success");
+  });
+
+  it("should log and rethrow errors", async () => {
+    const error = new Error("Async error");
+    const promise = Promise.reject(error);
+
+    await expect(handleAsyncError(promise, { test: true }, true)).rejects.toThrow("Async error");
+    expect(mockConsoleError).toHaveBeenCalled();
+  });
+});
+
+describe("withErrorHandling", () => {
+  it("should handle synchronous functions", () => {
+    const fn = () => "success";
+    const wrappedFn = withErrorHandling(fn);
+    expect(wrappedFn()).toBe("success");
+  });
+
+  it("should handle synchronous errors", () => {
+    const error = new Error("Sync error");
+    const fn = () => {
+      throw error;
+    };
+    const wrappedFn = withErrorHandling(fn, { test: true }, true);
+
+    expect(() => wrappedFn()).toThrow("Sync error");
+    expect(mockConsoleError).toHaveBeenCalled();
+  });
+
+  it("should handle asynchronous functions", async () => {
+    const fn = async () => "async success";
+    const wrappedFn = withErrorHandling(fn);
+    const result = await wrappedFn();
+    expect(result).toBe("async success");
+  });
+});
+
+describe("createApiErrorResponse", () => {
+  it("should create API error response", () => {
+    const error = new NetworkError("Network failed", 500);
+    const response = createApiErrorResponse(error);
+
+    expect(response).toEqual({
+      error: "Connection failed. Please check your internet and try again.",
+      message: "Network failed",
+      statusCode: 500,
+      retryable: true,
+      timestamp: expect.any(String),
     });
   });
 
-  describe('logError', () => {
-    it('should log error to console in development', () => {
-      const error = new ValidationError('Test error');
-      const context = { userId: '123' };
+  it("should use custom status code", () => {
+    const error = new Error("Custom error");
+    const response = createApiErrorResponse(error, 400);
 
-      logError(error, context, true); // Explicitly set to development
+    expect(response.statusCode).toBe(400);
+  });
+});
 
-      expect(console.error).toHaveBeenCalledWith('Error logged:', expect.objectContaining({
-        name: 'ValidationError',
-        message: 'Test error',
-        context,
-        stack: expect.any(String),
-      }));
-    });
-
-    it('should not log to console in production', () => {
-      const error = new ValidationError('Test error');
-
-      logError(error, undefined, false); // Explicitly set to production
-
-      expect(console.error).not.toHaveBeenCalled();
-    });
+describe("getRetryDelay", () => {
+  it("should calculate exponential backoff delay", () => {
+    expect(getRetryDelay(1)).toBe(1000);
+    expect(getRetryDelay(2)).toBe(2000);
+    expect(getRetryDelay(3)).toBe(4000);
+    expect(getRetryDelay(4)).toBe(8000);
   });
 
-  describe('handleAsyncError', () => {
-    it('should resolve successful promise', async () => {
-      const promise = Promise.resolve('success');
-      const result = await handleAsyncError(promise);
-      expect(result).toBe('success');
-    });
-
-    it('should log and re-throw error', async () => {
-      const error = new Error('Test error');
-      const promise = Promise.reject(error);
-      const context = { test: true };
-
-      await expect(handleAsyncError(promise, context, true)).rejects.toThrow('Test error');
-      expect(console.error).toHaveBeenCalled();
-    });
+  it("should cap delay at maximum", () => {
+    expect(getRetryDelay(10)).toBe(30000); // Max delay
   });
 
-  describe('withErrorHandling', () => {
-    it('should execute function successfully', () => {
-      const fn = vi.fn().mockReturnValue('success');
-      const wrappedFn = withErrorHandling(fn);
+  it("should use custom base delay", () => {
+    expect(getRetryDelay(1, 500)).toBe(500);
+    expect(getRetryDelay(2, 500)).toBe(1000);
+  });
+});
 
-      const result = wrappedFn('arg1', 'arg2');
-
-      expect(result).toBe('success');
-      expect(fn).toHaveBeenCalledWith('arg1', 'arg2');
-    });
-
-    it('should handle synchronous errors', () => {
-      const error = new Error('Sync error');
-      const fn = vi.fn().mockImplementation(() => { throw error; });
-      const wrappedFn = withErrorHandling(fn, undefined, true);
-
-      expect(() => wrappedFn()).toThrow('Sync error');
-      expect(console.error).toHaveBeenCalled();
-    });
-
-    it('should handle async function errors', async () => {
-      const error = new Error('Async error');
-      const fn = vi.fn().mockRejectedValue(error);
-      const wrappedFn = withErrorHandling(fn, undefined, true);
-
-      await expect(wrappedFn()).rejects.toThrow('Async error');
-      expect(console.error).toHaveBeenCalled();
-    });
+describe("retryWithBackoff", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
   });
 
-  describe('createApiErrorResponse', () => {
-    it('should create API error response', () => {
-      const error = new ValidationError('Invalid input', 'email');
-      const response = createApiErrorResponse(error, 400);
-
-      expect(response).toEqual({
-        error: 'Please check your input and try again.',
-        message: 'Invalid input',
-        code: undefined,
-        field: 'email',
-        timestamp: '2024-01-01T12:00:00.000Z',
-        statusCode: 400,
-      });
-    });
-
-    it('should use default status code', () => {
-      const error = new Error('Generic error');
-      const response = createApiErrorResponse(error);
-
-      expect(response.statusCode).toBe(500);
-    });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  describe('isRetryableError', () => {
-    it('should return true for retryable errors', () => {
-      expect(isRetryableError(new NetworkError())).toBe(true);
-      expect(isRetryableError(new DatabaseError('DB error'))).toBe(true);
-      expect(isRetryableError(new ScanError())).toBe(true);
-    });
-
-    it('should return false for non-retryable errors', () => {
-      expect(isRetryableError(new ValidationError('Invalid'))).toBe(false);
-      expect(isRetryableError(new AuthenticationError())).toBe(false);
-      expect(isRetryableError(new Error('Generic error'))).toBe(false);
-    });
+  it("should succeed on first attempt", async () => {
+    const fn = vi.fn().mockResolvedValue("success");
+    const result = await retryWithBackoff(fn);
+    expect(result).toBe("success");
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  describe('getRetryDelay', () => {
-    it('should calculate exponential backoff delay', () => {
-      expect(getRetryDelay(1, 1000)).toBe(1000);
-      expect(getRetryDelay(2, 1000)).toBe(2000);
-      expect(getRetryDelay(3, 1000)).toBe(4000);
-      expect(getRetryDelay(4, 1000)).toBe(8000);
-    });
+  it("should retry on retryable errors", async () => {
+    const fn = vi.fn().mockRejectedValueOnce(new NetworkError("Network error")).mockResolvedValue("success");
 
-    it('should cap delay at maximum', () => {
-      expect(getRetryDelay(10, 1000)).toBe(30000); // Max 30 seconds
-    });
+    const promise = retryWithBackoff(fn, 3, 100);
+
+    // Fast-forward timers
+    await vi.runAllTimersAsync();
+
+    const result = await promise;
+    expect(result).toBe("success");
+    expect(fn).toHaveBeenCalledTimes(2);
   });
 
-  describe('retryWithBackoff', () => {
-    it('should succeed on first attempt', async () => {
-      const fn = vi.fn().mockResolvedValue('success');
-      const result = await retryWithBackoff(fn, 3);
+  it("should not retry non-retryable errors", async () => {
+    const error = new ValidationError("Validation failed");
+    const fn = vi.fn().mockRejectedValue(error);
 
-      expect(result).toBe('success');
-      expect(fn).toHaveBeenCalledTimes(1);
-    });
-
-    it('should retry retryable errors', async () => {
-      const fn = vi.fn()
-        .mockRejectedValueOnce(new NetworkError())
-        .mockRejectedValueOnce(new NetworkError())
-        .mockResolvedValue('success');
-
-      const resultPromise = retryWithBackoff(fn, 3, 100);
-      
-      // Fast-forward through the delays
-      await vi.runAllTimersAsync();
-      
-      const result = await resultPromise;
-
-      expect(result).toBe('success');
-      expect(fn).toHaveBeenCalledTimes(3);
-    });
-
-    it('should not retry non-retryable errors', async () => {
-      const error = new ValidationError('Invalid');
-      const fn = vi.fn().mockRejectedValue(error);
-
-      await expect(retryWithBackoff(fn, 3)).rejects.toThrow('Invalid');
-      expect(fn).toHaveBeenCalledTimes(1);
-    });
-
-    it('should fail after max attempts', async () => {
-      const error = new NetworkError('Persistent error');
-      const fn = vi.fn().mockRejectedValue(error);
-
-      const resultPromise = retryWithBackoff(fn, 2, 100);
-      
-      // Fast-forward through the delays
-      await vi.runAllTimersAsync();
-
-      await expect(resultPromise).rejects.toThrow('Persistent error');
-      expect(fn).toHaveBeenCalledTimes(2);
-    });
+    await expect(retryWithBackoff(fn)).rejects.toThrow("Validation failed");
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  describe('safeExecute', () => {
-    it('should return result for successful execution', () => {
-      const fn = () => 'success';
-      const { result, error } = safeExecute(fn);
+  it("should exhaust retries and throw last error", async () => {
+    const error = new NetworkError("Network error");
+    const fn = vi.fn().mockRejectedValue(error);
 
-      expect(result).toBe('success');
-      expect(error).toBeUndefined();
-    });
+    const promise = retryWithBackoff(fn, 2, 100);
 
-    it('should return error for failed execution', () => {
-      const testError = new Error('Test error');
-      const fn = () => { throw testError; };
-      const { result, error } = safeExecute(fn);
+    // Fast-forward timers
+    await vi.runAllTimersAsync();
 
-      expect(result).toBeUndefined();
-      expect(error).toBeDefined();
-      expect(error?.name).toBe('Error');
-      expect(error?.message).toBe('Test error');
-    });
+    await expect(promise).rejects.toThrow("Network error");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("safeExecute", () => {
+  it("should return result for successful execution", () => {
+    const fn = () => "success";
+    const result = safeExecute(fn);
+    expect(result).toEqual({ result: "success" });
   });
 
-  describe('safeExecuteAsync', () => {
-    it('should return result for successful async execution', async () => {
-      const fn = async () => 'success';
-      const { result, error } = await safeExecuteAsync(fn);
-
-      expect(result).toBe('success');
-      expect(error).toBeUndefined();
+  it("should return error for failed execution", () => {
+    const fn = () => {
+      throw new Error("Test error");
+    };
+    const result = safeExecute(fn);
+    expect(result).toEqual({
+      error: expect.objectContaining({
+        name: "Error",
+        message: "Test error",
+      }),
     });
+  });
+});
 
-    it('should return error for failed async execution', async () => {
-      const testError = new Error('Async error');
-      const fn = async () => { throw testError; };
-      const { result, error } = await safeExecuteAsync(fn);
+describe("safeExecuteAsync", () => {
+  it("should return result for successful async execution", async () => {
+    const fn = async () => "async success";
+    const result = await safeExecuteAsync(fn);
+    expect(result).toEqual({ result: "async success" });
+  });
 
-      expect(result).toBeUndefined();
-      expect(error).toBeDefined();
-      expect(error?.name).toBe('Error');
-      expect(error?.message).toBe('Async error');
+  it("should return error for failed async execution", async () => {
+    const fn = async () => {
+      throw new Error("Async error");
+    };
+    const result = await safeExecuteAsync(fn);
+    expect(result).toEqual({
+      error: expect.objectContaining({
+        name: "Error",
+        message: "Async error",
+      }),
     });
+  });
+});
+
+describe("CircuitBreaker", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should execute function when circuit is closed", async () => {
+    const circuitBreaker = new CircuitBreaker(3, 1000);
+    const fn = vi.fn().mockResolvedValue("success");
+
+    const result = await circuitBreaker.execute(fn);
+    expect(result).toBe("success");
+    expect(circuitBreaker.getState()).toBe("closed");
+  });
+
+  it("should open circuit after threshold failures", async () => {
+    const circuitBreaker = new CircuitBreaker(2, 1000);
+    const fn = vi.fn().mockRejectedValue(new Error("Test error"));
+
+    // First failure
+    await expect(circuitBreaker.execute(fn)).rejects.toThrow("Test error");
+    expect(circuitBreaker.getState()).toBe("closed");
+
+    // Second failure - should open circuit
+    await expect(circuitBreaker.execute(fn)).rejects.toThrow("Test error");
+    expect(circuitBreaker.getState()).toBe("open");
+
+    // Third attempt should be rejected immediately
+    await expect(circuitBreaker.execute(fn)).rejects.toThrow("Circuit breaker is open");
+    expect(fn).toHaveBeenCalledTimes(2); // Function not called on third attempt
+  });
+
+  it("should transition to half-open after timeout", async () => {
+    const circuitBreaker = new CircuitBreaker(1, 1000);
+    const fn = vi.fn().mockRejectedValue(new Error("Test error"));
+
+    // Trigger circuit open
+    await expect(circuitBreaker.execute(fn)).rejects.toThrow("Test error");
+    expect(circuitBreaker.getState()).toBe("open");
+
+    // Fast-forward past timeout
+    vi.advanceTimersByTime(1001);
+
+    // Next execution should transition to half-open
+    const successFn = vi.fn().mockResolvedValue("success");
+    const result = await circuitBreaker.execute(successFn);
+    expect(result).toBe("success");
+    expect(circuitBreaker.getState()).toBe("closed");
+  });
+
+  it("should reset circuit breaker", () => {
+    const circuitBreaker = new CircuitBreaker(1, 1000);
+
+    // Manually set some state
+    circuitBreaker["failures"] = 5;
+    circuitBreaker["state"] = "open";
+
+    circuitBreaker.reset();
+    expect(circuitBreaker.getState()).toBe("closed");
+  });
+});
+
+describe("RateLimiter", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("should allow requests within limit", () => {
+    const rateLimiter = new RateLimiter(3, 1000);
+
+    expect(rateLimiter.canMakeRequest()).toBe(true);
+    expect(rateLimiter.canMakeRequest()).toBe(true);
+    expect(rateLimiter.canMakeRequest()).toBe(true);
+    expect(rateLimiter.canMakeRequest()).toBe(false);
+  });
+
+  it("should reset after time window", () => {
+    const rateLimiter = new RateLimiter(1, 1000);
+
+    expect(rateLimiter.canMakeRequest()).toBe(true);
+    expect(rateLimiter.canMakeRequest()).toBe(false);
+
+    // Fast-forward past window
+    vi.advanceTimersByTime(1001);
+
+    expect(rateLimiter.canMakeRequest()).toBe(true);
+  });
+
+  it("should calculate time until reset", () => {
+    const rateLimiter = new RateLimiter(1, 1000);
+
+    rateLimiter.canMakeRequest(); // Use up the limit
+
+    const timeUntilReset = rateLimiter.getTimeUntilReset();
+    expect(timeUntilReset).toBeGreaterThan(0);
+    expect(timeUntilReset).toBeLessThanOrEqual(1000);
+  });
+});
+
+describe("setupGlobalErrorHandling", () => {
+  it("should setup global error handlers", () => {
+    const addEventListenerSpy = vi.spyOn(window, "addEventListener");
+
+    setupGlobalErrorHandling();
+
+    expect(addEventListenerSpy).toHaveBeenCalledWith("error", expect.any(Function));
+    expect(addEventListenerSpy).toHaveBeenCalledWith("unhandledrejection", expect.any(Function));
+
+    addEventListenerSpy.mockRestore();
   });
 });

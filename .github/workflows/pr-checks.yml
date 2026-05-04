@@ -1,0 +1,161 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Cancel previous runs for the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-validation:
+    name: PR Validation
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for merge conflicts
+        run: |
+          git merge-tree $(git merge-base HEAD ${{ github.event.pull_request.base.sha }}) HEAD ${{ github.event.pull_request.base.sha }} | grep -q "<<<<<<< " && echo "Merge conflicts detected" && exit 1 || echo "No merge conflicts"
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Check code formatting
+        run: npm run format -- --check
+
+      - name: Run unit tests
+        run: npm run test:coverage
+
+      - name: Check test coverage threshold
+        run: |
+          # Extract coverage percentage from coverage report
+          if [ -f coverage/coverage-summary.json ]; then
+            node -e "
+              const fs = require('fs');
+              const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              const total = coverage.total;
+              const lines = total.lines.pct;
+              const functions = total.functions.pct;
+              const branches = total.branches.pct;
+              const statements = total.statements.pct;
+              const minCoverage = Math.min(lines, functions, branches, statements);
+              console.log(\`Minimum coverage: \${minCoverage}%\`);
+              console.log(\`- Lines: \${lines}%\`);
+              console.log(\`- Functions: \${functions}%\`);
+              console.log(\`- Branches: \${branches}%\`);
+              console.log(\`- Statements: \${statements}%\`);
+              if (minCoverage < 80) {
+                console.log('❌ Coverage is below 80% threshold');
+                process.exit(1);
+              } else {
+                console.log('✅ Coverage meets 80% threshold');
+              }
+            "
+          else
+            echo "❌ Coverage report not found"
+            exit 1
+          fi
+
+      - name: Build application
+        run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Start application for E2E tests
+        run: |
+          npm run preview &
+          sleep 10
+        env:
+          NODE_ENV: test
+
+      - name: Run smoke E2E tests
+        run: npm run e2e:smoke
+        env:
+          NODE_ENV: test
+
+      - name: Comment PR with test results
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = '## 🧪 Test Results\n\n';
+            
+            // Add coverage info if available
+            if (fs.existsSync('coverage/coverage-summary.json')) {
+              const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              const total = coverage.total;
+              comment += `### Coverage Report\n`;
+              comment += `- **Lines:** ${total.lines.pct}%\n`;
+              comment += `- **Functions:** ${total.functions.pct}%\n`;
+              comment += `- **Branches:** ${total.branches.pct}%\n`;
+              comment += `- **Statements:** ${total.statements.pct}%\n\n`;
+            }
+            
+            comment += `### Build Status\n`;
+            comment += `- **Lint:** ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }}\n`;
+            comment += `- **Unit Tests:** ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }}\n`;
+            comment += `- **Build:** ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }}\n`;
+            comment += `- **E2E Smoke Tests:** ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }}\n\n`;
+            
+            if ('${{ job.status }}' !== 'success') {
+              comment += `### ❌ Some checks failed\n`;
+              comment += `Please review the failed checks and fix any issues before merging.\n\n`;
+              comment += `[View full results](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+            } else {
+              comment += `### ✅ All checks passed\n`;
+              comment += `This PR is ready for review and merge!\n`;
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # This job will only run if all checks pass
+  pr-ready:
+    name: PR Ready for Merge
+    runs-on: ubuntu-latest
+    needs: [pr-validation]
+    if: success()
+    
+    steps:
+      - name: Mark PR as ready
+        run: |
+          echo "✅ All PR checks passed successfully!"
+          echo "This PR is ready for review and merge."
+
+  # This job will run if any checks fail
+  pr-blocked:
+    name: PR Blocked
+    runs-on: ubuntu-latest
+    needs: [pr-validation]
+    if: failure()
+    
+    steps:
+      - name: Block PR merge
+        run: |
+          echo "❌ PR checks failed!"
+          echo "This PR cannot be merged until all checks pass."
+          exit 1
