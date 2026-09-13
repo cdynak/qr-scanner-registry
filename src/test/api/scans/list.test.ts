@@ -1,32 +1,47 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "../../../pages/api/scans/list";
 import type { APIContext } from "astro";
 import type { User, Scan } from "../../../types";
 
-// Mock Supabase client
+// Mock Supabase query builder with stable, chainable references.
+// The SUT chains: from().select().eq(user_id).order()[.eq(scan_type)][.gte()][.lte()].range()
+// `range` is the awaited terminal; tests configure it via `mockRange.mockResolvedValue(...)`.
+const mockRange = vi.fn();
+const mockLte = vi.fn();
+const mockGte = vi.fn();
+const mockOrder = vi.fn();
+const mockEq = vi.fn();
+const mockSelect = vi.fn();
+const mockFrom = vi.fn();
+
 const mockSupabaseClient = {
-  from: vi.fn(() => ({
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        order: vi.fn(() => ({
-          gte: vi.fn(() => ({
-            lte: vi.fn(() => ({
-              range: vi.fn(),
-            })),
-          })),
-          lte: vi.fn(() => ({
-            range: vi.fn(),
-          })),
-          range: vi.fn(),
-        })),
-      })),
-    })),
-  })),
+  from: mockFrom,
 };
+
+// Wire the chainable builder. Every intermediate call returns the same builder,
+// so filters (eq/gte/lte) can be applied in any combination before `range()`.
+// `eq` is shared for both the user_id filter and the scan_type filter.
+function wireQueryBuilder() {
+  const builder: Record<string, unknown> = {};
+  builder.eq = mockEq;
+  builder.gte = mockGte;
+  builder.lte = mockLte;
+  builder.range = mockRange;
+  builder.order = mockOrder;
+
+  mockEq.mockReturnValue(builder);
+  mockOrder.mockReturnValue(builder);
+  mockGte.mockReturnValue(builder);
+  mockLte.mockReturnValue(builder);
+  mockSelect.mockReturnValue(builder);
+  mockFrom.mockReturnValue({ select: mockSelect });
+}
 
 // Mock the Supabase module
 vi.mock("../../../db/supabase", () => ({
   createServerSupabaseClient: () => mockSupabaseClient,
+  createUserScopedClient: () => mockSupabaseClient,
 }));
 
 // Mock validation functions
@@ -71,6 +86,7 @@ describe("GET /api/scans/list", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    wireQueryBuilder();
 
     mockContext = {
       request: new Request("http://localhost/api/scans/list"),
@@ -91,15 +107,11 @@ describe("GET /api/scans/list", () => {
     vi.mocked(validatePaginationParams).mockReturnValue({ limit: 20, offset: 0 });
 
     // Mock successful database query
-    const mockQueryChain = {
-      range: vi.fn().mockResolvedValue({
-        data: mockScans,
-        error: null,
-        count: 2,
-      }),
-    };
-
-    mockSupabaseClient.from().select().eq().order.mockReturnValue(mockQueryChain);
+    mockRange.mockResolvedValue({
+      data: mockScans,
+      error: null,
+      count: 2,
+    });
 
     const response = await GET(mockContext as APIContext);
     const responseData = await response.json();
@@ -136,15 +148,11 @@ describe("GET /api/scans/list", () => {
     const { validatePaginationParams } = await import("../../../lib/validation");
     vi.mocked(validatePaginationParams).mockReturnValue({ limit: 10, offset: 20 });
 
-    const mockQueryChain = {
-      range: vi.fn().mockResolvedValue({
-        data: mockScans,
-        error: null,
-        count: 50,
-      }),
-    };
-
-    mockSupabaseClient.from().select().eq().order.mockReturnValue(mockQueryChain);
+    mockRange.mockResolvedValue({
+      data: mockScans,
+      error: null,
+      count: 50,
+    });
 
     const response = await GET(mockContext as APIContext);
     const responseData = await response.json();
@@ -156,7 +164,7 @@ describe("GET /api/scans/list", () => {
       limit: 10,
       hasMore: true, // 20 + 10 < 50
     });
-    expect(mockQueryChain.range).toHaveBeenCalledWith(20, 29); // offset to offset + limit - 1
+    expect(mockRange).toHaveBeenCalledWith(20, 29); // offset to offset + limit - 1
   });
 
   it("should handle scan type filter", async () => {
@@ -165,24 +173,18 @@ describe("GET /api/scans/list", () => {
     const { validatePaginationParams } = await import("../../../lib/validation");
     vi.mocked(validatePaginationParams).mockReturnValue({ limit: 20, offset: 0 });
 
-    const mockQueryChain = {
-      eq: vi.fn(() => ({
-        range: vi.fn().mockResolvedValue({
-          data: [mockScans[0]], // Only QR scans
-          error: null,
-          count: 1,
-        }),
-      })),
-    };
-
-    mockSupabaseClient.from().select().eq().order.mockReturnValue(mockQueryChain);
+    mockRange.mockResolvedValue({
+      data: [mockScans[0]], // Only QR scans
+      error: null,
+      count: 1,
+    });
 
     const response = await GET(mockContext as APIContext);
     const responseData = await response.json();
 
     expect(response.status).toBe(200);
     expect(responseData.data).toEqual([mockScans[0]]);
-    expect(mockQueryChain.eq).toHaveBeenCalledWith("scan_type", "qr");
+    expect(mockEq).toHaveBeenCalledWith("scan_type", "qr");
   });
 
   it("should handle date range filters", async () => {
@@ -192,25 +194,17 @@ describe("GET /api/scans/list", () => {
     vi.mocked(validatePaginationParams).mockReturnValue({ limit: 20, offset: 0 });
     vi.mocked(validateDateString).mockImplementation(() => {}); // No validation errors
 
-    const mockQueryChain = {
-      gte: vi.fn(() => ({
-        lte: vi.fn(() => ({
-          range: vi.fn().mockResolvedValue({
-            data: mockScans,
-            error: null,
-            count: 2,
-          }),
-        })),
-      })),
-    };
-
-    mockSupabaseClient.from().select().eq().order.mockReturnValue(mockQueryChain);
+    mockRange.mockResolvedValue({
+      data: mockScans,
+      error: null,
+      count: 2,
+    });
 
     const response = await GET(mockContext as APIContext);
 
     expect(response.status).toBe(200);
-    expect(mockQueryChain.gte).toHaveBeenCalledWith("scanned_at", "2024-01-01");
-    expect(mockQueryChain.gte().lte).toHaveBeenCalledWith("scanned_at", "2024-01-31");
+    expect(mockGte).toHaveBeenCalledWith("scanned_at", "2024-01-01");
+    expect(mockLte).toHaveBeenCalledWith("scanned_at", "2024-01-31");
     expect(validateDateString).toHaveBeenCalledWith("2024-01-01", "startDate");
     expect(validateDateString).toHaveBeenCalledWith("2024-01-31", "endDate");
   });
@@ -273,15 +267,11 @@ describe("GET /api/scans/list", () => {
     const { validatePaginationParams } = await import("../../../lib/validation");
     vi.mocked(validatePaginationParams).mockReturnValue({ limit: 20, offset: 0 });
 
-    const mockQueryChain = {
-      range: vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: "Database connection failed" },
-        count: null,
-      }),
-    };
-
-    mockSupabaseClient.from().select().eq().order.mockReturnValue(mockQueryChain);
+    mockRange.mockResolvedValue({
+      data: null,
+      error: { message: "Database connection failed" },
+      count: null,
+    });
 
     const response = await GET(mockContext as APIContext);
     const responseData = await response.json();
@@ -295,15 +285,11 @@ describe("GET /api/scans/list", () => {
     const { validatePaginationParams } = await import("../../../lib/validation");
     vi.mocked(validatePaginationParams).mockReturnValue({ limit: 20, offset: 0 });
 
-    const mockQueryChain = {
-      range: vi.fn().mockResolvedValue({
-        data: [],
-        error: null,
-        count: 0,
-      }),
-    };
-
-    mockSupabaseClient.from().select().eq().order.mockReturnValue(mockQueryChain);
+    mockRange.mockResolvedValue({
+      data: [],
+      error: null,
+      count: 0,
+    });
 
     const response = await GET(mockContext as APIContext);
     const responseData = await response.json();

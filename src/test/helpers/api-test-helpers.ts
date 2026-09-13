@@ -70,10 +70,13 @@ export function createMockAPIContext(options: {
     delete: vi.fn(),
   };
 
-  const mockRedirect = vi.fn((url: string) => new Response(null, {
-    status: 302,
-    headers: { Location: url },
-  }));
+  const mockRedirect = vi.fn(
+    (url: string) =>
+      new Response(null, {
+        status: 302,
+        headers: { Location: url },
+      })
+  );
 
   return {
     request,
@@ -128,22 +131,22 @@ export async function assertAPIResponse(
   }
 ) {
   expect(response.status).toBe(expectedStatus);
-  
+
   if (expectedStructure) {
     const data = await response.json();
-    
+
     if (expectedStructure.hasData) {
       expect(data).toHaveProperty("data");
     }
-    
+
     if (expectedStructure.hasError) {
       expect(data).toHaveProperty("error");
     }
-    
+
     if (expectedStructure.hasMessage) {
       expect(data).toHaveProperty("message");
     }
-    
+
     if (expectedStructure.hasPagination) {
       expect(data).toHaveProperty("pagination");
     }

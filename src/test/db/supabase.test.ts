@@ -15,8 +15,11 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 
 describe("Supabase Client Configuration", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // Reset the shared current-user cache so tests don't leak state.
+    const { clearCurrentUserCache } = await import("../../db/supabase");
+    clearCurrentUserCache();
   });
 
   describe("Environment Variables", () => {
@@ -59,77 +62,137 @@ describe("Supabase Client Configuration", () => {
   });
 
   describe("Authentication Helpers", () => {
+    // getCurrentUser / isAuthenticated resolve the app session via the
+    // server endpoint /api/auth/me (the session cookie is HttpOnly), so we
+    // mock global fetch rather than the Supabase auth client.
     describe("getCurrentUser", () => {
       it("should return user when authentication is successful", async () => {
         const mockUser = {
           id: "user-123",
           email: "test@example.com",
-          user_metadata: { name: "Test User" },
+          name: "Test User",
         };
 
-        mockAuthGetUser.mockResolvedValue({
-          data: { user: mockUser },
-          error: null,
-        });
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ data: mockUser }),
+          })
+        );
 
         const { getCurrentUser } = await import("../../db/supabase");
         const user = await getCurrentUser();
 
         expect(user).toEqual(mockUser);
-        expect(mockAuthGetUser).toHaveBeenCalledOnce();
+        expect(fetch).toHaveBeenCalledWith("/api/auth/me", expect.objectContaining({ credentials: "include" }));
+
+        vi.unstubAllGlobals();
       });
 
-      it("should throw error when authentication fails", async () => {
-        const mockError = { message: "Invalid token" };
-
-        mockAuthGetUser.mockResolvedValue({
-          data: { user: null },
-          error: mockError,
+      it("coalesces concurrent calls into a single request", async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({ data: { id: "user-123" } }),
         });
+        vi.stubGlobal("fetch", fetchMock);
 
         const { getCurrentUser } = await import("../../db/supabase");
 
-        await expect(getCurrentUser()).rejects.toThrow("Failed to get current user: Invalid token");
+        // Two simultaneous callers (e.g. Navigation + AuthGuard) should share
+        // one underlying /api/auth/me request.
+        const [a, b] = await Promise.all([getCurrentUser(), getCurrentUser()]);
+
+        expect(a).toEqual({ id: "user-123" });
+        expect(b).toEqual({ id: "user-123" });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        vi.unstubAllGlobals();
+      });
+
+      it("should return null when not authenticated (401)", async () => {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockResolvedValue({
+            ok: false,
+            status: 401,
+            json: async () => ({ error: "Not authenticated", data: null }),
+          })
+        );
+
+        const { getCurrentUser } = await import("../../db/supabase");
+
+        await expect(getCurrentUser()).resolves.toBeNull();
+
+        vi.unstubAllGlobals();
+      });
+
+      it("should throw error on unexpected server error", async () => {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockResolvedValue({
+            ok: false,
+            status: 500,
+            json: async () => ({}),
+          })
+        );
+
+        const { getCurrentUser } = await import("../../db/supabase");
+
+        await expect(getCurrentUser()).rejects.toThrow("Failed to get current user: 500");
+
+        vi.unstubAllGlobals();
       });
     });
 
     describe("isAuthenticated", () => {
       it("should return true when user is authenticated", async () => {
-        const mockUser = {
-          id: "user-123",
-          email: "test@example.com",
-        };
-
-        mockAuthGetUser.mockResolvedValue({
-          data: { user: mockUser },
-          error: null,
-        });
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ data: { id: "user-123", email: "test@example.com" } }),
+          })
+        );
 
         const { isAuthenticated } = await import("../../db/supabase");
         const result = await isAuthenticated();
 
         expect(result).toBe(true);
+
+        vi.unstubAllGlobals();
       });
 
       it("should return false when user is not authenticated", async () => {
-        mockAuthGetUser.mockResolvedValue({
-          data: { user: null },
-          error: { message: "No user found" },
-        });
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockResolvedValue({
+            ok: false,
+            status: 401,
+            json: async () => ({ data: null }),
+          })
+        );
 
         const { isAuthenticated } = await import("../../db/supabase");
         const result = await isAuthenticated();
 
         expect(result).toBe(false);
+
+        vi.unstubAllGlobals();
       });
 
       it("should return false when getCurrentUser throws an error", async () => {
-        mockAuthGetUser.mockRejectedValue(new Error("Network error"));
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network error")));
 
         const { isAuthenticated } = await import("../../db/supabase");
         const result = await isAuthenticated();
 
         expect(result).toBe(false);
+
+        vi.unstubAllGlobals();
       });
     });
   });
@@ -166,6 +229,52 @@ describe("Supabase Client Configuration", () => {
           persistSession: false,
         },
       });
+    });
+  });
+
+  describe("createUserScopedClient", () => {
+    it("falls back to the service-role client for a non-JWT sentinel token", async () => {
+      mockCreateClient.mockClear();
+      const { createUserScopedClient } = await import("../../db/supabase");
+
+      createUserScopedClient("no-supabase-jwt");
+
+      // Should use the service role key, with no Authorization header.
+      expect(mockCreateClient).toHaveBeenCalledWith(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        expect.objectContaining({ auth: { autoRefreshToken: false, persistSession: false } })
+      );
+      const lastCall = mockCreateClient.mock.calls.at(-1);
+      expect(lastCall?.[2]?.global?.headers?.Authorization).toBeUndefined();
+    });
+
+    it("falls back to the service-role client when no token is provided", async () => {
+      mockCreateClient.mockClear();
+      const { createUserScopedClient } = await import("../../db/supabase");
+
+      createUserScopedClient(undefined);
+
+      expect(mockCreateClient).toHaveBeenCalledWith(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        expect.anything()
+      );
+    });
+
+    it("uses the anon key with an Authorization header for a valid user JWT", async () => {
+      mockCreateClient.mockClear();
+      const { createUserScopedClient } = await import("../../db/supabase");
+
+      // Minimal JWT-shaped token with a `sub` claim.
+      const payload = Buffer.from(JSON.stringify({ sub: "user-123", role: "authenticated" })).toString("base64");
+      const jwt = `header.${payload}.signature`;
+
+      createUserScopedClient(jwt);
+
+      const lastCall = mockCreateClient.mock.calls.at(-1);
+      expect(lastCall?.[1]).toBe(process.env.SUPABASE_ANON_KEY);
+      expect(lastCall?.[2]?.global?.headers?.Authorization).toBe(`Bearer ${jwt}`);
     });
   });
 });

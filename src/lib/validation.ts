@@ -299,7 +299,10 @@ export function containsXSS(input: string): boolean {
   const xssPatterns = [
     /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
     /javascript:/i,
-    /on\w+\s*=/i,
+    // Inline event handlers, but only in an HTML-attribute context so ordinary
+    // text (e.g. names like "Ronald" or "one = two") is not flagged as malicious.
+    /<[^>]+\son\w+\s*=/i,
+    /\son\w+\s*=\s*["']/i,
     /<iframe/i,
     /<object/i,
     /<embed/i,

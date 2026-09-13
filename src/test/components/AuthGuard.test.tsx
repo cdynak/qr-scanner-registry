@@ -1,13 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { AuthGuard, useAuth } from "../../components/AuthGuard";
-import type { User, AuthSession } from "../../types";
-import * as authUtils from "../../lib/auth";
+import type { User } from "../../types";
+import * as supabaseLib from "../../db/supabase";
 
-// Mock the auth utilities
-vi.mock("../../lib/auth", () => ({
-  parseSessionFromCookie: vi.fn(),
-  getUserFromSession: vi.fn(),
+// Mock the supabase helper used to resolve the current user from the server.
+vi.mock("../../db/supabase", () => ({
+  getCurrentUser: vi.fn(),
 }));
 
 const mockUser: User = {
@@ -19,18 +18,6 @@ const mockUser: User = {
   created_at: "2024-01-01T00:00:00Z",
   updated_at: "2024-01-01T00:00:00Z",
 };
-
-const mockSession: AuthSession = {
-  user: mockUser,
-  accessToken: "token123",
-  expiresAt: new Date(Date.now() + 3600000).toISOString(),
-};
-
-// Mock document.cookie
-Object.defineProperty(document, "cookie", {
-  writable: true,
-  value: "",
-});
 
 // Mock window.location
 const mockLocation = {
@@ -72,8 +59,7 @@ describe("AuthGuard", () => {
 
   it("renders children when user is authenticated", async () => {
     document.cookie = "session=valid-session-cookie";
-    vi.mocked(authUtils.parseSessionFromCookie).mockReturnValue(mockSession);
-    vi.mocked(authUtils.getUserFromSession).mockReturnValue(mockUser);
+    vi.mocked(supabaseLib.getCurrentUser).mockResolvedValue(mockUser);
 
     render(
       <AuthGuard>
@@ -88,8 +74,7 @@ describe("AuthGuard", () => {
 
   it("shows login prompt when user is not authenticated and auth is required", async () => {
     document.cookie = "";
-    vi.mocked(authUtils.parseSessionFromCookie).mockReturnValue(null);
-    vi.mocked(authUtils.getUserFromSession).mockReturnValue(null);
+    vi.mocked(supabaseLib.getCurrentUser).mockResolvedValue(null);
 
     render(
       <AuthGuard>
@@ -106,8 +91,7 @@ describe("AuthGuard", () => {
 
   it("renders children when auth is not required", async () => {
     document.cookie = "";
-    vi.mocked(authUtils.parseSessionFromCookie).mockReturnValue(null);
-    vi.mocked(authUtils.getUserFromSession).mockReturnValue(null);
+    vi.mocked(supabaseLib.getCurrentUser).mockResolvedValue(null);
 
     render(
       <AuthGuard requireAuth={false}>
@@ -122,8 +106,7 @@ describe("AuthGuard", () => {
 
   it("shows custom fallback when provided and user is not authenticated", async () => {
     document.cookie = "";
-    vi.mocked(authUtils.parseSessionFromCookie).mockReturnValue(null);
-    vi.mocked(authUtils.getUserFromSession).mockReturnValue(null);
+    vi.mocked(supabaseLib.getCurrentUser).mockResolvedValue(null);
 
     render(
       <AuthGuard fallback={<div>Custom login form</div>}>
@@ -139,8 +122,7 @@ describe("AuthGuard", () => {
 
   it("redirects when redirectTo is provided and user is not authenticated", async () => {
     document.cookie = "";
-    vi.mocked(authUtils.parseSessionFromCookie).mockReturnValue(null);
-    vi.mocked(authUtils.getUserFromSession).mockReturnValue(null);
+    vi.mocked(supabaseLib.getCurrentUser).mockResolvedValue(null);
 
     render(
       <AuthGuard redirectTo="/login">
@@ -155,9 +137,7 @@ describe("AuthGuard", () => {
 
   it("shows error state when authentication fails", async () => {
     document.cookie = "session=invalid-session";
-    vi.mocked(authUtils.parseSessionFromCookie).mockImplementation(() => {
-      throw new Error("Invalid session");
-    });
+    vi.mocked(supabaseLib.getCurrentUser).mockRejectedValue(new Error("Invalid session"));
 
     render(
       <AuthGuard>
@@ -174,8 +154,7 @@ describe("AuthGuard", () => {
 
   it("handles missing session cookie gracefully", async () => {
     document.cookie = "";
-    vi.mocked(authUtils.parseSessionFromCookie).mockReturnValue(null);
-    vi.mocked(authUtils.getUserFromSession).mockReturnValue(null);
+    vi.mocked(supabaseLib.getCurrentUser).mockResolvedValue(null);
 
     render(
       <AuthGuard>
@@ -227,8 +206,7 @@ describe("useAuth", () => {
 
   it("returns authenticated user when session is valid", async () => {
     document.cookie = "session=valid-session-cookie";
-    vi.mocked(authUtils.parseSessionFromCookie).mockReturnValue(mockSession);
-    vi.mocked(authUtils.getUserFromSession).mockReturnValue(mockUser);
+    vi.mocked(supabaseLib.getCurrentUser).mockResolvedValue(mockUser);
 
     render(<TestComponent />);
 
@@ -242,8 +220,7 @@ describe("useAuth", () => {
 
   it("returns unauthenticated state when no session", async () => {
     document.cookie = "";
-    vi.mocked(authUtils.parseSessionFromCookie).mockReturnValue(null);
-    vi.mocked(authUtils.getUserFromSession).mockReturnValue(null);
+    vi.mocked(supabaseLib.getCurrentUser).mockResolvedValue(null);
 
     render(<TestComponent />);
 
@@ -257,9 +234,7 @@ describe("useAuth", () => {
 
   it("returns error state when authentication fails", async () => {
     document.cookie = "session=invalid-session";
-    vi.mocked(authUtils.parseSessionFromCookie).mockImplementation(() => {
-      throw new Error("Session parse error");
-    });
+    vi.mocked(supabaseLib.getCurrentUser).mockRejectedValue(new Error("Session parse error"));
 
     render(<TestComponent />);
 

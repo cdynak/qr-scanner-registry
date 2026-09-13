@@ -2,18 +2,71 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { onRequest } from "../../middleware/index";
 import type { AuthSession } from "../../types";
 
-// Mock the auth utilities
+// Mock collaborators the middleware depends on so we can focus on session handling.
 vi.mock("../../lib/auth", () => ({
   isSessionValid: vi.fn(),
+  validateSessionCookie: vi.fn(),
 }));
+
+vi.mock("../../db/supabase", () => ({
+  createServerSupabaseClient: vi.fn(() => ({})),
+}));
+
+vi.mock("../../lib/csrf", () => ({
+  generateCSRFToken: vi.fn(() => "csrf-token"),
+  getCSRFCookieOptions: vi.fn(() => ({ path: "/" })),
+}));
+
+vi.mock("../../lib/security", () => ({
+  applySecurityHeaders: vi.fn((response: Response) => response),
+  getClientIP: vi.fn(() => "127.0.0.1"),
+}));
+
+vi.mock("../../lib/errors", () => ({
+  logError: vi.fn(),
+  createApiErrorResponse: vi.fn(() => ({ error: "err", statusCode: 500 })),
+  setupGlobalErrorHandling: vi.fn(),
+}));
+
+interface MockContextOptions {
+  cookieValue?: string | null | undefined;
+  pathname?: string;
+}
+
+/**
+ * Builds a mock Astro middleware context with the fields the middleware reads.
+ */
+function createMockContext(options: MockContextOptions = {}) {
+  const { cookieValue, pathname = "/" } = options;
+
+  const cookieStore = new Map<string, { value: string }>();
+  const cookies = {
+    get: vi.fn((name: string) => (name === "session" ? cookieRecord : cookieStore.get(name))),
+    set: vi.fn((name: string, value: string) => cookieStore.set(name, { value })),
+    delete: vi.fn(),
+  };
+  const cookieRecord = cookieValue === undefined ? undefined : cookieValue === null ? null : { value: cookieValue };
+
+  const context = {
+    cookies,
+    locals: {} as Record<string, unknown>,
+    url: new URL(`https://localhost:3000${pathname}`),
+    request: new Request(`https://localhost:3000${pathname}`, {
+      headers: { "user-agent": "vitest-agent-string" },
+    }),
+  };
+
+  return context;
+}
 
 describe("Authentication Middleware", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("should set session data when valid session cookie exists", async () => {
-    const { isSessionValid } = await import("../../lib/auth");
+  it("should set session data when a valid session cookie exists", async () => {
+    const { isSessionValid, validateSessionCookie } = await import("../../lib/auth");
+    (validateSessionCookie as any).mockReturnValue(true);
     (isSessionValid as any).mockReturnValue(true);
 
     const mockSession: AuthSession = {
@@ -30,179 +83,103 @@ describe("Authentication Middleware", () => {
       expiresAt: new Date(Date.now() + 3600000).toISOString(),
     };
 
-    const mockCookies = {
-      get: vi.fn().mockReturnValue({
-        value: JSON.stringify(mockSession),
-      }),
-      delete: vi.fn(),
-    };
+    const context = createMockContext({ cookieValue: encodeURIComponent(JSON.stringify(mockSession)) });
+    const next = vi.fn().mockResolvedValue(new Response("OK"));
 
-    const mockLocals = {};
-    const mockNext = vi.fn().mockResolvedValue(new Response("OK"));
+    await onRequest(context as any, next);
 
-    const context = {
-      cookies: mockCookies,
-      locals: mockLocals,
-    };
-
-    await onRequest(context as any, mockNext);
-
-    expect(mockCookies.get).toHaveBeenCalledWith("session");
-    expect(isSessionValid).toHaveBeenCalledWith(mockSession);
-    expect(mockLocals).toEqual({
-      session: mockSession,
-      user: mockSession.user,
-      isAuthenticated: true,
-    });
-    expect(mockNext).toHaveBeenCalled();
+    expect(context.cookies.get).toHaveBeenCalledWith("session");
+    expect(context.locals.session).toEqual(mockSession);
+    expect(context.locals.user).toEqual(mockSession.user);
+    expect(context.locals.isAuthenticated).toBe(true);
+    expect(next).toHaveBeenCalled();
   });
 
-  it("should clear invalid session cookie and set null values", async () => {
-    const { isSessionValid } = await import("../../lib/auth");
+  it("should clear an invalid session cookie and set null values", async () => {
+    const { isSessionValid, validateSessionCookie } = await import("../../lib/auth");
+    (validateSessionCookie as any).mockReturnValue(true);
     (isSessionValid as any).mockReturnValue(false);
 
     const invalidSession = {
       user: { id: "1", name: "Test" },
       accessToken: "expired-token",
-      expiresAt: "2020-01-01T00:00:00Z", // Expired
+      expiresAt: "2020-01-01T00:00:00Z",
     };
 
-    const mockCookies = {
-      get: vi.fn().mockReturnValue({
-        value: JSON.stringify(invalidSession),
-      }),
-      delete: vi.fn(),
-    };
+    const context = createMockContext({ cookieValue: encodeURIComponent(JSON.stringify(invalidSession)) });
+    const next = vi.fn().mockResolvedValue(new Response("OK"));
 
-    const mockLocals = {};
-    const mockNext = vi.fn().mockResolvedValue(new Response("OK"));
+    await onRequest(context as any, next);
 
-    const context = {
-      cookies: mockCookies,
-      locals: mockLocals,
-    };
-
-    await onRequest(context as any, mockNext);
-
-    expect(mockCookies.get).toHaveBeenCalledWith("session");
-    expect(mockCookies.delete).toHaveBeenCalledWith("session", { path: "/" });
-    expect(mockLocals).toEqual({
-      session: null,
-      user: null,
-      isAuthenticated: false,
-    });
-    expect(mockNext).toHaveBeenCalled();
+    expect(context.cookies.delete).toHaveBeenCalledWith("session", { path: "/" });
+    expect(context.locals.session).toBeNull();
+    expect(context.locals.user).toBeNull();
+    expect(context.locals.isAuthenticated).toBe(false);
+    expect(next).toHaveBeenCalled();
   });
 
-  it("should handle malformed session cookie", async () => {
-    const mockCookies = {
-      get: vi.fn().mockReturnValue({
-        value: "invalid-json",
-      }),
-      delete: vi.fn(),
-    };
+  it("should handle a malformed session cookie", async () => {
+    const { validateSessionCookie } = await import("../../lib/auth");
+    // Malformed cookie fails format validation.
+    (validateSessionCookie as any).mockReturnValue(false);
 
-    const mockLocals = {};
-    const mockNext = vi.fn().mockResolvedValue(new Response("OK"));
+    const context = createMockContext({ cookieValue: "invalid-json" });
+    const next = vi.fn().mockResolvedValue(new Response("OK"));
 
-    const context = {
-      cookies: mockCookies,
-      locals: mockLocals,
-    };
+    await onRequest(context as any, next);
 
-    // Mock console.error to avoid test output noise
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    await onRequest(context as any, mockNext);
-
-    expect(mockCookies.get).toHaveBeenCalledWith("session");
-    expect(mockCookies.delete).toHaveBeenCalledWith("session", { path: "/" });
-    expect(consoleSpy).toHaveBeenCalledWith("Error parsing session cookie:", expect.any(Error));
-    expect(mockLocals).toEqual({
-      session: null,
-      user: null,
-      isAuthenticated: false,
-    });
-    expect(mockNext).toHaveBeenCalled();
-
-    consoleSpy.mockRestore();
+    expect(context.cookies.delete).toHaveBeenCalledWith("session", { path: "/" });
+    expect(context.locals.session).toBeNull();
+    expect(context.locals.user).toBeNull();
+    expect(context.locals.isAuthenticated).toBe(false);
+    expect(next).toHaveBeenCalled();
   });
 
-  it("should handle missing session cookie", async () => {
-    const mockCookies = {
-      get: vi.fn().mockReturnValue(undefined),
-      delete: vi.fn(),
-    };
+  it("should handle a missing session cookie", async () => {
+    const context = createMockContext({ cookieValue: undefined });
+    const next = vi.fn().mockResolvedValue(new Response("OK"));
 
-    const mockLocals = {};
-    const mockNext = vi.fn().mockResolvedValue(new Response("OK"));
+    await onRequest(context as any, next);
 
-    const context = {
-      cookies: mockCookies,
-      locals: mockLocals,
-    };
-
-    await onRequest(context as any, mockNext);
-
-    expect(mockCookies.get).toHaveBeenCalledWith("session");
-    expect(mockCookies.delete).not.toHaveBeenCalled();
-    expect(mockLocals).toEqual({
-      session: null,
-      user: null,
-      isAuthenticated: false,
-    });
-    expect(mockNext).toHaveBeenCalled();
+    expect(context.cookies.get).toHaveBeenCalledWith("session");
+    expect(context.locals.session).toBeNull();
+    expect(context.locals.user).toBeNull();
+    expect(context.locals.isAuthenticated).toBe(false);
+    expect(next).toHaveBeenCalled();
   });
 
-  it("should handle null session cookie value", async () => {
-    const mockCookies = {
-      get: vi.fn().mockReturnValue(null),
-      delete: vi.fn(),
-    };
+  it("should handle a null session cookie value", async () => {
+    const context = createMockContext({ cookieValue: null });
+    const next = vi.fn().mockResolvedValue(new Response("OK"));
 
-    const mockLocals = {};
-    const mockNext = vi.fn().mockResolvedValue(new Response("OK"));
+    await onRequest(context as any, next);
 
-    const context = {
-      cookies: mockCookies,
-      locals: mockLocals,
-    };
-
-    await onRequest(context as any, mockNext);
-
-    expect(mockCookies.get).toHaveBeenCalledWith("session");
-    expect(mockLocals).toEqual({
-      session: null,
-      user: null,
-      isAuthenticated: false,
-    });
-    expect(mockNext).toHaveBeenCalled();
+    expect(context.cookies.get).toHaveBeenCalledWith("session");
+    expect(context.locals.session).toBeNull();
+    expect(context.locals.user).toBeNull();
+    expect(context.locals.isAuthenticated).toBe(false);
+    expect(next).toHaveBeenCalled();
   });
 
-  it("should pass through response from next middleware", async () => {
-    const { isSessionValid } = await import("../../lib/auth");
+  it("should pass through the response from the next middleware", async () => {
+    const { isSessionValid, validateSessionCookie } = await import("../../lib/auth");
+    (validateSessionCookie as any).mockReturnValue(true);
     (isSessionValid as any).mockReturnValue(true);
 
     const mockResponse = new Response("Custom Response", { status: 201 });
-    const mockNext = vi.fn().mockResolvedValue(mockResponse);
+    const next = vi.fn().mockResolvedValue(mockResponse);
 
-    const mockCookies = {
-      get: vi.fn().mockReturnValue({
-        value: JSON.stringify({
+    const context = createMockContext({
+      cookieValue: encodeURIComponent(
+        JSON.stringify({
           user: { id: "1", name: "Test" },
           accessToken: "token",
           expiresAt: new Date(Date.now() + 3600000).toISOString(),
-        }),
-      }),
-      delete: vi.fn(),
-    };
+        })
+      ),
+    });
 
-    const context = {
-      cookies: mockCookies,
-      locals: {},
-    };
-
-    const result = await onRequest(context as any, mockNext);
+    const result = await onRequest(context as any, next);
 
     expect(result).toBe(mockResponse);
     expect(result.status).toBe(201);

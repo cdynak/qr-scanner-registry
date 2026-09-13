@@ -2,14 +2,13 @@
 import MainLayout from "../layouts/MainLayout.astro";
 import { AuthGuard } from "../components/AuthGuard";
 import { ScanHistory } from "../components/ScanHistory";
-import { LoginButton } from "../components/LoginButton";
 ---
 
 <MainLayout title="QR Scanner Registry - Scan History">
   <div class="container mx-auto px-4 py-8">
     <AuthGuard client:load>
-      <!-- Authenticated User Content -->
-      <div slot="authenticated" class="max-w-4xl mx-auto">
+      <!-- Authenticated User Content (rendered by AuthGuard when logged in) -->
+      <div class="max-w-4xl mx-auto">
         <div class="flex items-center justify-between mb-8">
           <div>
             <h1 class="text-3xl font-bold text-foreground mb-2">Scan History</h1>
@@ -159,32 +158,6 @@ import { LoginButton } from "../components/LoginButton";
             </svg>
             Scanner
           </a>
-        </div>
-      </div>
-
-      <!-- Unauthenticated User Content -->
-      <div slot="unauthenticated" class="max-w-md mx-auto text-center">
-        <div class="bg-card rounded-lg border p-8 shadow-sm">
-          <div class="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              ></path>
-            </svg>
-          </div>
-          <h2 class="text-2xl font-semibold mb-4">Authentication Required</h2>
-          <p class="text-muted-foreground mb-6">
-            You need to sign in with your Google account to view your scan history
-          </p>
-          <LoginButton client:load />
-          <div class="mt-4">
-            <a href="/" class="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              ← Back to Home
-            </a>
-          </div>
         </div>
       </div>
     </AuthGuard>

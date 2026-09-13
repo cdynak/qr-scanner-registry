@@ -109,16 +109,16 @@ export function getUserFromSession(session: AuthSession | null | undefined): Use
  */
 export function getSessionCookieOptions(isProduction = false) {
   return {
-    httpOnly: false, // Allow JavaScript access for client-side auth detection
+    // HttpOnly so the session (which carries the access token) is never readable
+    // by JavaScript. Client-side auth state is detected via the /api/auth/me
+    // endpoint instead of reading this cookie.
+    httpOnly: true,
     secure: isProduction,
-    sameSite: "strict" as const, // Changed to strict for better security
+    // "lax" allows the cookie to be sent on the top-level OAuth redirect back
+    // from Google while still blocking cross-site POST/CSRF vectors.
+    sameSite: "lax" as const,
     maxAge: 3600, // 1 hour
     path: "/",
-    // Add additional security headers
-    ...(isProduction && {
-      domain: undefined, // Let browser set domain automatically
-      priority: "high" as const,
-    }),
   };
 }
 

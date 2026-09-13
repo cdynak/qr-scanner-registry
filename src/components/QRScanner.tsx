@@ -125,7 +125,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScanSaved, className = "
       }
 
       // Handle different types of scan errors
-      let errorMessage = "Scanning failed. Please try again.";
+      let errorMessage = "Scanning failed. Please try again or check your camera.";
 
       if (scanError instanceof Error) {
         if (scanError.name === "NotAllowedError") {

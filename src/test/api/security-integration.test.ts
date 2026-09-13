@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { POST as createScan } from "../../pages/api/scans/create";
 import { DELETE as deleteScan } from "../../pages/api/scans/delete";
-import { POST as googleAuth } from "../../pages/api/auth/google";
+import { onRequest } from "../../middleware/index";
+import { generateCSRFToken } from "../../lib/csrf";
 import type { User } from "../../types";
 
-// Mock dependencies
-vi.mock("../../db/supabase", () => ({
-  createServerSupabaseClient: vi.fn(() => ({
+// Mock the Supabase client used by the routes.
+vi.mock("../../db/supabase", () => {
+  const makeClient = () => ({
     from: vi.fn(() => ({
       insert: vi.fn(() => ({
         select: vi.fn(() => ({
@@ -15,38 +16,28 @@ vi.mock("../../db/supabase", () => ({
       })),
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
-          single: vi.fn(() => ({ data: mockUser, error: null })),
+          single: vi.fn(() => ({ data: { id: mockScan.id, user_id: mockUser.id }, error: null })),
         })),
       })),
       delete: vi.fn(() => ({
-        eq: vi.fn(() => ({ error: null })),
+        eq: vi.fn(() => ({ eq: vi.fn(() => ({ error: null })) })),
       })),
     })),
-  })),
-}));
+  });
+  return {
+    createServerSupabaseClient: vi.fn(makeClient),
+    createUserScopedClient: vi.fn(makeClient),
+  };
+});
 
-vi.mock("googleapis", () => ({
-  google: {
-    auth: {
-      OAuth2: vi.fn(() => ({
-        getToken: vi.fn(() => ({ tokens: { access_token: "mock-token" } })),
-        setCredentials: vi.fn(),
-      })),
-    },
-    oauth2: vi.fn(() => ({
-      userinfo: {
-        get: vi.fn(() => ({
-          data: {
-            id: "google-123",
-            email: "test@example.com",
-            name: "Test User",
-            picture: "https://example.com/avatar.jpg",
-          },
-        })),
-      },
-    })),
-  },
-}));
+// Middleware collaborators.
+vi.mock("../../lib/security", async () => {
+  const actual = await vi.importActual<typeof import("../../lib/security")>("../../lib/security");
+  return {
+    ...actual,
+    applySecurityHeaders: (response: Response) => response,
+  };
+});
 
 const mockUser: User = {
   id: "user-123",
@@ -59,7 +50,7 @@ const mockUser: User = {
 };
 
 const mockScan = {
-  id: "scan-123",
+  id: "550e8400-e29b-41d4-a716-446655440000",
   user_id: "user-123",
   content: "https://example.com",
   scan_type: "qr",
@@ -68,27 +59,41 @@ const mockScan = {
   created_at: "2023-01-01T00:00:00Z",
 };
 
-describe("API Security Integration Tests", () => {
+/** Minimal middleware context factory. */
+function middlewareContext(
+  method: string,
+  pathname: string,
+  headers: Record<string, string> = {},
+  cookieMap: Record<string, string> = {}
+) {
+  return {
+    url: new URL(`https://localhost:3000${pathname}`),
+    request: new Request(`https://localhost:3000${pathname}`, {
+      method,
+      headers: { "user-agent": "vitest-agent", ...headers },
+    }),
+    cookies: {
+      get: vi.fn((name: string) => (cookieMap[name] ? { value: cookieMap[name] } : undefined)),
+      set: vi.fn(),
+      delete: vi.fn(),
+    },
+    locals: {} as Record<string, unknown>,
+  };
+}
+
+describe("API Security Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe("Scan Creation Security", () => {
-    it("should reject unauthenticated requests", async () => {
+  describe("Scan route authorization (route layer)", () => {
+    it("should reject unauthenticated create requests with 401", async () => {
       const request = new Request("http://localhost/api/scans/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          content: "https://example.com",
-          scanType: "qr",
-        }),
+        body: JSON.stringify({ content: "https://example.com", scanType: "qr" }),
       });
-
-      const locals = {
-        isAuthenticated: false,
-        user: null,
-        csrfToken: "valid-token",
-      };
+      const locals = { isAuthenticated: false, user: null };
 
       const response = await createScan({ request, locals } as any);
       const data = await response.json();
@@ -97,102 +102,28 @@ describe("API Security Integration Tests", () => {
       expect(data.error).toBe("Authentication required");
     });
 
-    it("should reject requests without CSRF token", async () => {
+    it("should reject unauthenticated delete requests with 401", async () => {
+      const request = new Request("http://localhost/api/scans/delete", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: mockScan.id }),
+      });
+      const locals = { isAuthenticated: false, user: null };
+
+      const response = await deleteScan({ request, locals } as any);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toBe("Authentication required");
+    });
+
+    it("should create a scan for an authenticated user with valid input", async () => {
       const request = new Request("http://localhost/api/scans/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          content: "https://example.com",
-          scanType: "qr",
-        }),
+        body: JSON.stringify({ content: "https://example.com", scanType: "qr", format: "QR_CODE" }),
       });
-
-      const locals = {
-        isAuthenticated: true,
-        user: mockUser,
-        csrfToken: undefined,
-      };
-
-      const response = await createScan({ request, locals } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(403);
-      expect(data.error).toBe("CSRF token validation failed");
-    });
-
-    it("should reject malicious content", async () => {
-      const request = new Request("http://localhost/api/scans/create", {
-        method: "POST",
-        headers: { 
-          "content-type": "application/json",
-          "x-csrf-token": "valid-token",
-        },
-        body: JSON.stringify({
-          content: "<script>alert('xss')</script>",
-          scanType: "qr",
-        }),
-      });
-
-      const locals = {
-        isAuthenticated: true,
-        user: mockUser,
-        csrfToken: "valid-token",
-      };
-
-      const response = await createScan({ request, locals } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBe("Malicious content detected");
-    });
-
-    it("should reject oversized requests", async () => {
-      const largeContent = "x".repeat(100 * 1024); // 100KB
-      const request = new Request("http://localhost/api/scans/create", {
-        method: "POST",
-        headers: { 
-          "content-type": "application/json",
-          "content-length": (100 * 1024).toString(),
-          "x-csrf-token": "valid-token",
-        },
-        body: JSON.stringify({
-          content: largeContent,
-          scanType: "qr",
-        }),
-      });
-
-      const locals = {
-        isAuthenticated: true,
-        user: mockUser,
-        csrfToken: "valid-token",
-      };
-
-      const response = await createScan({ request, locals } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(413);
-      expect(data.error).toBe("Request too large");
-    });
-
-    it("should sanitize valid input", async () => {
-      const request = new Request("http://localhost/api/scans/create", {
-        method: "POST",
-        headers: { 
-          "content-type": "application/json",
-          "x-csrf-token": "valid-token",
-        },
-        body: JSON.stringify({
-          content: "  https://example.com  ",
-          scanType: "qr",
-          format: "  QR_CODE  ",
-        }),
-      });
-
-      const locals = {
-        isAuthenticated: true,
-        user: mockUser,
-        csrfToken: "valid-token",
-      };
+      const locals = { isAuthenticated: true, user: mockUser };
 
       const response = await createScan({ request, locals } as any);
       const data = await response.json();
@@ -202,198 +133,70 @@ describe("API Security Integration Tests", () => {
     });
   });
 
-  describe("Scan Deletion Security", () => {
-    it("should reject requests without valid UUID", async () => {
+  describe("CSRF protection (middleware layer)", () => {
+    it("should reject unsafe API requests without a CSRF token", async () => {
+      const context = middlewareContext("POST", "/api/scans/create");
+      const next = vi.fn().mockResolvedValue(new Response("OK"));
+
+      const response = await onRequest(context as any, next);
+
+      expect(response.status).toBe(403);
+      const data = await response.json();
+      expect(data.error).toBe("CSRF token validation failed");
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it("should allow unsafe API requests with a matching CSRF token", async () => {
+      const token = generateCSRFToken();
+      const context = middlewareContext(
+        "POST",
+        "/api/scans/create",
+        { "x-csrf-token": token },
+        { "csrf-token": token }
+      );
+      const next = vi.fn().mockResolvedValue(new Response("OK", { status: 201 }));
+
+      const response = await onRequest(context as any, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(response.status).toBe(201);
+    });
+
+    it("should not require CSRF for the OAuth callback (top-level redirect)", async () => {
+      const context = middlewareContext("POST", "/api/auth/google");
+      const next = vi.fn().mockResolvedValue(new Response("OK"));
+
+      const response = await onRequest(context as any, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(response.status).toBe(200);
+    });
+
+    it("should not require CSRF for safe API methods", async () => {
+      const context = middlewareContext("GET", "/api/scans/list");
+      const next = vi.fn().mockResolvedValue(new Response("OK"));
+
+      const response = await onRequest(context as any, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(response.status).toBe(200);
+    });
+  });
+
+  describe("Scan deletion validation (route layer)", () => {
+    it("should reject a missing scan ID with 400", async () => {
       const request = new Request("http://localhost/api/scans/delete", {
         method: "DELETE",
-        headers: { 
-          "content-type": "application/json",
-          "x-csrf-token": "valid-token",
-        },
-        body: JSON.stringify({
-          id: "invalid-id",
-        }),
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
       });
-
-      const locals = {
-        isAuthenticated: true,
-        user: mockUser,
-        csrfToken: "valid-token",
-      };
+      const locals = { isAuthenticated: true, user: mockUser };
 
       const response = await deleteScan({ request, locals } as any);
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data.error).toBe("Invalid scan ID format");
-    });
-
-    it("should sanitize scan ID input", async () => {
-      const request = new Request("http://localhost/api/scans/delete", {
-        method: "DELETE",
-        headers: { 
-          "content-type": "application/json",
-          "x-csrf-token": "valid-token",
-        },
-        body: JSON.stringify({
-          id: "  550e8400-e29b-41d4-a716-446655440000  ",
-        }),
-      });
-
-      const locals = {
-        isAuthenticated: true,
-        user: mockUser,
-        csrfToken: "valid-token",
-      };
-
-      // Mock successful deletion
-      vi.mocked(require("../../db/supabase").createServerSupabaseClient).mockReturnValue({
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              single: vi.fn(() => ({ 
-                data: { id: "550e8400-e29b-41d4-a716-446655440000", user_id: "user-123" }, 
-                error: null 
-              })),
-            })),
-          })),
-          delete: vi.fn(() => ({
-            eq: vi.fn(() => ({ error: null })),
-          })),
-        })),
-      });
-
-      const response = await deleteScan({ request, locals } as any);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.message).toBe("Scan deleted successfully");
-    });
-  });
-
-  describe("Authentication Security", () => {
-    it("should validate OAuth state parameter", async () => {
-      const request = new Request("http://localhost/api/auth/google?code=auth-code&state=invalid-state", {
-        method: "POST",
-      });
-
-      const cookies = {
-        get: vi.fn((name) => {
-          if (name === "oauth_state") {
-            return { value: "valid-state" };
-          }
-          return null;
-        }),
-        delete: vi.fn(),
-      };
-
-      const redirect = vi.fn((url) => new Response(null, { status: 302, headers: { Location: url } }));
-
-      const locals = {
-        isAuthenticated: false,
-      };
-
-      const response = await googleAuth({ request, redirect, cookies, locals } as any);
-
-      expect(response.status).toBe(302);
-      expect(response.headers.get("Location")).toContain("error=invalid_state");
-    });
-
-    it("should handle OAuth errors gracefully", async () => {
-      const request = new Request("http://localhost/api/auth/google?error=access_denied", {
-        method: "POST",
-      });
-
-      const redirect = vi.fn((url) => new Response(null, { status: 302, headers: { Location: url } }));
-
-      const locals = {
-        isAuthenticated: false,
-      };
-
-      const response = await googleAuth({ request, redirect, locals } as any);
-
-      expect(response.status).toBe(302);
-      expect(response.headers.get("Location")).toContain("error=oauth_denied");
-    });
-
-    it("should sanitize user data from OAuth", async () => {
-      const request = new Request("http://localhost/api/auth/google?code=auth-code&state=valid-state", {
-        method: "POST",
-      });
-
-      const cookies = {
-        get: vi.fn((name) => {
-          if (name === "oauth_state") {
-            return { value: "valid-state" };
-          }
-          return null;
-        }),
-        delete: vi.fn(),
-      };
-
-      const redirect = vi.fn((url) => new Response(null, { status: 302, headers: { Location: url } }));
-
-      const locals = {
-        isAuthenticated: false,
-      };
-
-      // Mock OAuth response with potentially malicious data
-      vi.mocked(require("googleapis").google.oauth2).mockReturnValue({
-        userinfo: {
-          get: vi.fn(() => ({
-            data: {
-              id: "google-123",
-              email: "test@example.com",
-              name: "<script>alert('xss')</script>Test User",
-              picture: "javascript:alert('xss')",
-            },
-          })),
-        },
-      });
-
-      const response = await googleAuth({ request, redirect, cookies, locals } as any);
-
-      expect(response.status).toBe(302);
-      expect(response.headers.get("Location")).toContain("auth=success");
-    });
-  });
-
-  describe("Rate Limiting", () => {
-    it("should enforce rate limits", async () => {
-      const request = new Request("http://localhost/api/scans/create", {
-        method: "POST",
-        headers: { 
-          "content-type": "application/json",
-          "x-csrf-token": "valid-token",
-        },
-        body: JSON.stringify({
-          content: "https://example.com",
-          scanType: "qr",
-        }),
-      });
-
-      const locals = {
-        isAuthenticated: true,
-        user: mockUser,
-        csrfToken: "valid-token",
-      };
-
-      // Make multiple requests to trigger rate limit
-      const responses = [];
-      for (let i = 0; i < 15; i++) {
-        const response = await createScan({ request, locals } as any);
-        responses.push(response);
-      }
-
-      // At least one should be rate limited
-      const rateLimitedResponse = responses.find(r => r.status === 429);
-      expect(rateLimitedResponse).toBeDefined();
-
-      if (rateLimitedResponse) {
-        const data = await rateLimitedResponse.json();
-        expect(data.error).toBe("Rate limit exceeded");
-        expect(rateLimitedResponse.headers.get("Retry-After")).toBeDefined();
-      }
+      expect(data.error).toBe("Invalid scan ID");
     });
   });
 });

@@ -1,264 +1,263 @@
 import type { APIRoute } from "astro";
 import { google } from "googleapis";
-import { createServerSupabaseClient } from "../../../db/supabase";
+import { createClient, useMockDb } from "../../../db/supabase";
 import { createAuthSession, createSecureSessionCookie } from "../../../lib/auth";
+import { signSupabaseUserJwt } from "../../../lib/supabase-jwt";
 import { ValidationError } from "../../../types";
-import {
-  AuthenticationError,
-  NetworkError,
-  createApiErrorResponse,
-  logError,
-  retryWithBackoff,
-} from "../../../lib/errors";
-import { SecurityMiddleware, getClientIP } from "../../../lib/security";
+import { AuthenticationError, NetworkError, logError, retryWithBackoff } from "../../../lib/errors";
+import { getClientIP } from "../../../lib/security";
 import { sanitizeUserInput } from "../../../lib/validation";
 
-const oauth2Client = new google.auth.OAuth2(
-  import.meta.env.GOOGLE_CLIENT_ID,
-  import.meta.env.GOOGLE_CLIENT_SECRET,
-  `${import.meta.env.NEXTAUTH_URL}/api/auth/google`
-);
+/**
+ * Local/offline login: skips Google entirely and signs in a deterministic
+ * development user backed by the in-memory store. Only used when USE_MOCK_DB
+ * is enabled.
+ */
+async function mockLogin(redirect: (url: string) => Response): Promise<Response> {
+  const googleUser = {
+    id: "local-dev-google-id",
+    email: "local.dev@example.com",
+    name: "Local Dev User",
+    picture: null as string | null,
+  };
+
+  const supabase = createClient();
+
+  const { data: existingUser } = await supabase.from("users").select("*").eq("google_id", googleUser.id).single();
+
+  let user = existingUser;
+  if (!user) {
+    const { data: newUser } = await supabase
+      .from("users")
+      .insert({
+        google_id: googleUser.id,
+        email: googleUser.email,
+        name: googleUser.name,
+        avatar_url: googleUser.picture,
+      })
+      .select()
+      .single();
+    user = newUser;
+  }
+
+  const session = createAuthSession(user, "mock-access-token", 3600);
+  const response = redirect("/?auth=success");
+  response.headers.append("Set-Cookie", createSecureSessionCookie(session, false));
+  response.headers.append("Set-Cookie", "authenticated=true; Path=/; Max-Age=3600; SameSite=Lax;");
+  return response;
+}
+
+function getOAuthClient() {
+  return new google.auth.OAuth2(
+    import.meta.env.GOOGLE_CLIENT_ID,
+    import.meta.env.GOOGLE_CLIENT_SECRET,
+    `${import.meta.env.NEXTAUTH_URL}/api/auth/google`
+  );
+}
 
 /**
- * Handles Google OAuth authentication flow
- * GET: Redirects to Google OAuth consent screen
- * POST: Handles OAuth callback and creates/updates user session
+ * Redirects the caller to Google's OAuth consent screen.
  */
-export const GET: APIRoute = async ({ request, redirect, cookies, locals }) => {
-  console.log("OAuth GET request received:", request.url);
+function initiateOAuth(redirect: (url: string) => Response): Response | Promise<Response> {
+  // Local/offline mode: sign in directly without contacting Google.
+  if (useMockDb) {
+    return mockLogin(redirect);
+  }
 
   try {
-    // Temporarily skip security middleware for OAuth callback debugging
-
-    // Validate environment variables
     if (!import.meta.env.GOOGLE_CLIENT_ID || !import.meta.env.GOOGLE_CLIENT_SECRET) {
       throw new AuthenticationError("OAuth configuration missing");
     }
 
-    const url = new URL(request.url);
-    const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state");
-    const error = url.searchParams.get("error");
-
-    // If this is a callback (has code parameter), handle it
-    if (code || error) {
-      console.log("Processing OAuth callback...");
-
-      // Handle OAuth errors
-      if (error) {
-        console.log("OAuth error detected:", error);
-        logError(new AuthenticationError(`OAuth error: ${error}`), {
-          route: "/api/auth/google",
-          method: "GET",
-          oauthError: error,
-          clientIP: getClientIP(request),
-        });
-        return redirect("/?error=oauth_denied");
-      }
-
-      if (!code) {
-        throw new ValidationError("Authorization code is required");
-      }
-
-      // TODO: Re-enable state validation once cookie persistence is working
-      // For now, skip state validation to get basic OAuth working
-
-      // Clear any existing state cookie
-      cookies.delete("oauth_state", { path: "/" });
-
-      // Exchange authorization code for tokens with retry logic
-      const { tokens } = await retryWithBackoff(
-        async () => {
-          try {
-            return await oauth2Client.getToken(code);
-          } catch (err) {
-            if (err instanceof Error && err.message.includes("network")) {
-              throw new NetworkError("Failed to exchange OAuth code");
-            }
-            throw err;
-          }
-        },
-        3,
-        1000,
-        { route: "/api/auth/google", step: "token_exchange" }
-      );
-
-      oauth2Client.setCredentials(tokens);
-
-      // Get user information from Google with retry logic
-      const googleUser = await retryWithBackoff(
-        async () => {
-          try {
-            const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
-            const { data } = await oauth2.userinfo.get();
-            return data;
-          } catch (err) {
-            if (err instanceof Error && err.message.includes("network")) {
-              throw new NetworkError("Failed to fetch user info from Google");
-            }
-            throw err;
-          }
-        },
-        3,
-        1000,
-        { route: "/api/auth/google", step: "user_info" }
-      );
-
-      if (!googleUser.id || !googleUser.email || !googleUser.name) {
-        throw new AuthenticationError("Incomplete user information from Google");
-      }
-
-      // Try database operations with fallback to mock user
-      let user;
-
-      try {
-        console.log("Attempting to create/update user in Supabase...");
-
-        user = await retryWithBackoff(
-          async () => {
-            const supabase = createServerSupabaseClient();
-
-            // First, try to find existing user
-            const { data: existingUser, error: findError } = await supabase
-              .from("users")
-              .select("*")
-              .eq("google_id", googleUser.id)
-              .single();
-
-            if (existingUser && !findError) {
-              // Update existing user
-              const { data: updatedUser, error: updateError } = await supabase
-                .from("users")
-                .update({
-                  email: googleUser.email,
-                  name: googleUser.name,
-                  avatar_url: googleUser.picture || null,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("google_id", googleUser.id)
-                .select()
-                .single();
-
-              if (updateError || !updatedUser) {
-                logError(new Error(`Supabase user update failed: ${updateError?.message || "Unknown error"}`), {
-                  route: "/api/auth/google",
-                  step: "user_update",
-                  userId: existingUser.id,
-                  supabaseError: updateError,
-                  errorCode: updateError?.code,
-                  errorDetails: updateError?.details,
-                });
-                throw new AuthenticationError(
-                  `Failed to update user information: ${updateError?.message || "Unknown error"}`
-                );
-              }
-
-              return updatedUser;
-            } else {
-              // Create new user
-              const { data: newUser, error: createError } = await supabase
-                .from("users")
-                .insert({
-                  google_id: googleUser.id,
-                  email: googleUser.email,
-                  name: googleUser.name,
-                  avatar_url: googleUser.picture || null,
-                })
-                .select()
-                .single();
-
-              if (createError || !newUser) {
-                logError(new Error(`Supabase user creation failed: ${createError?.message || "Unknown error"}`), {
-                  route: "/api/auth/google",
-                  step: "user_create",
-                  googleId: googleUser.id,
-                  supabaseError: createError,
-                  errorCode: createError?.code,
-                  errorDetails: createError?.details,
-                });
-                throw new AuthenticationError(
-                  `Failed to create user account: ${createError?.message || "Unknown error"}`
-                );
-              }
-
-              return newUser;
-            }
-          },
-          3,
-          1000,
-          { route: "/api/auth/google", step: "database_operations" }
-        );
-
-        console.log("✅ User created/updated in Supabase successfully");
-      } catch (dbError) {
-        console.log("❌ Database operation failed, using mock user:", dbError.message);
-
-        // Fallback to mock user if database operations fail
-        user = {
-          id: crypto.randomUUID(),
-          google_id: googleUser.id,
-          email: googleUser.email,
-          name: googleUser.name,
-          avatar_url: googleUser.picture || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-      }
-
-      // Sanitize user data
-      const sanitizedUser = {
-        ...user,
-        name: sanitizeUserInput(user.name, { maxLength: 255 }),
-        email: sanitizeUserInput(user.email, { maxLength: 255 }),
-        avatar_url: user.avatar_url ? sanitizeUserInput(user.avatar_url, { maxLength: 500, allowUrls: true }) : null,
-      };
-
-      // Create authentication session
-      const session = createAuthSession(
-        sanitizedUser,
-        tokens.access_token || "",
-        3600 // 1 hour
-      );
-
-      const response = redirect("/?auth=success");
-
-      // Set secure session cookie
-      const sessionCookie = createSecureSessionCookie(session, import.meta.env.NODE_ENV === "production");
-      response.headers.set("Set-Cookie", sessionCookie);
-
-      return response;
-    }
-
-    // If no code parameter, this is the initial request - generate auth URL
-    const authUrl = oauth2Client.generateAuthUrl({
+    const authUrl = getOAuthClient().generateAuthUrl({
       access_type: "offline",
       scope: ["https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"],
       include_granted_scopes: true,
     });
 
-    // Redirect to Google OAuth
-    const response = redirect(authUrl);
+    return redirect(authUrl);
+  } catch (error) {
+    logError(error, { route: "/api/auth/google", step: "initiate" });
+    return new Response(JSON.stringify({ error: "Failed to initiate authentication" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
+/**
+ * Handles the OAuth callback: exchanges the code, fetches the Google profile,
+ * upserts the user in Supabase and establishes a session.
+ */
+async function handleCallback(request: Request, redirect: (url: string) => Response): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    const code = url.searchParams.get("code");
+    const error = url.searchParams.get("error");
+
+    if (error) {
+      logError(new AuthenticationError(`OAuth error: ${error}`), {
+        route: "/api/auth/google",
+        oauthError: error,
+        clientIP: getClientIP(request),
+      });
+      return redirect("/?error=oauth_denied");
+    }
+
+    if (!code) {
+      throw new ValidationError("Authorization code is required");
+    }
+
+    const oauth2Client = getOAuthClient();
+
+    // Exchange the authorization code for tokens.
+    const { tokens } = await retryWithBackoff(
+      async () => {
+        try {
+          return await oauth2Client.getToken(code);
+        } catch (err) {
+          if (err instanceof Error && err.message.includes("network")) {
+            throw new NetworkError("Failed to exchange OAuth code");
+          }
+          throw err;
+        }
+      },
+      3,
+      1000,
+      { route: "/api/auth/google", step: "token_exchange" }
+    );
+
+    oauth2Client.setCredentials(tokens);
+
+    // Fetch the user's Google profile.
+    const googleUser = await retryWithBackoff(
+      async () => {
+        try {
+          const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
+          const { data } = await oauth2.userinfo.get();
+          return data;
+        } catch (err) {
+          if (err instanceof Error && err.message.includes("network")) {
+            throw new NetworkError("Failed to fetch user info from Google");
+          }
+          throw err;
+        }
+      },
+      3,
+      1000,
+      { route: "/api/auth/google", step: "user_info" }
+    );
+
+    if (!googleUser.id || !googleUser.email || !googleUser.name) {
+      throw new AuthenticationError("Incomplete user information from Google");
+    }
+
+    // Upsert the user in Supabase.
+    const supabase = createClient();
+
+    const { data: existingUser } = await supabase.from("users").select("*").eq("google_id", googleUser.id).single();
+
+    let user;
+    if (existingUser) {
+      const { data: updatedUser, error: updateError } = await supabase
+        .from("users")
+        .update({
+          email: googleUser.email,
+          name: googleUser.name,
+          avatar_url: googleUser.picture || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("google_id", googleUser.id)
+        .select()
+        .single();
+
+      if (updateError || !updatedUser) {
+        throw new AuthenticationError(`Failed to update user information: ${updateError?.message || "Unknown error"}`);
+      }
+      user = updatedUser;
+    } else {
+      const { data: newUser, error: createError } = await supabase
+        .from("users")
+        .insert({
+          google_id: googleUser.id,
+          email: googleUser.email,
+          name: googleUser.name,
+          avatar_url: googleUser.picture || null,
+        })
+        .select()
+        .single();
+
+      if (createError || !newUser) {
+        throw new AuthenticationError(`Failed to create user account: ${createError?.message || "Unknown error"}`);
+      }
+      user = newUser;
+    }
+
+    // Sanitize user-provided fields before storing them in the session.
+    const sanitizedUser = {
+      ...user,
+      name: sanitizeUserInput(user.name, { maxLength: 255 }),
+      email: sanitizeUserInput(user.email, { maxLength: 255 }),
+      avatar_url: user.avatar_url ? sanitizeUserInput(user.avatar_url, { maxLength: 500, allowUrls: true }) : null,
+    };
+
+    // Mint a Supabase-compatible user JWT so DB queries run under RLS as this
+    // user. If no JWT secret is configured, store a non-JWT sentinel: it keeps
+    // the session valid but is ignored by createUserScopedClient (which then
+    // falls back to the service-role client). We must NOT store the Google
+    // access token here — sending it as a bearer would make Supabase treat the
+    // request as anon and RLS would hide all of the user's rows.
+    const supabaseToken = signSupabaseUserJwt(sanitizedUser.id, 3600) || "no-supabase-jwt";
+    const session = createAuthSession(sanitizedUser, supabaseToken, 3600);
+    const isProd = import.meta.env.NODE_ENV === "production";
+
+    const response = redirect("/?auth=success");
+
+    // HttpOnly session cookie (carries the token) + non-sensitive client flag.
+    response.headers.append("Set-Cookie", createSecureSessionCookie(session, isProd));
+    const secureAttr = isProd ? " Secure;" : "";
+    response.headers.append("Set-Cookie", `authenticated=true; Path=/; Max-Age=3600; SameSite=Lax;${secureAttr}`);
 
     return response;
   } catch (error) {
     logError(error, {
       route: "/api/auth/google",
-      method: "GET",
+      step: "callback",
       clientIP: getClientIP(request),
     });
 
     if (error instanceof ValidationError) {
       return redirect("/?error=invalid_request");
     }
-
     if (error instanceof AuthenticationError) {
       return redirect("/?error=auth_failed");
     }
-
     if (error instanceof NetworkError) {
       return redirect("/?error=network_error");
     }
-
     return redirect("/?error=server_error");
   }
+}
+
+/**
+ * GET /api/auth/google
+ * - With no `code`/`error`: initiates the OAuth flow (redirect to Google).
+ * - With `code`/`error` (Google redirects back via GET): handles the callback.
+ */
+export const GET: APIRoute = async ({ request, url, redirect }) => {
+  const hasCallbackParams = url.searchParams.has("code") || url.searchParams.has("error");
+
+  if (hasCallbackParams) {
+    return handleCallback(request, redirect);
+  }
+
+  return initiateOAuth(redirect);
+};
+
+/**
+ * POST /api/auth/google
+ * Handles the OAuth callback programmatically.
+ */
+export const POST: APIRoute = async ({ request, redirect }) => {
+  return handleCallback(request, redirect);
 };

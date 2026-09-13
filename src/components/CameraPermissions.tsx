@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { AlertCircle, Camera, Settings, RefreshCw } from "lucide-react";
-import { CameraError, logError, retryWithBackoff } from "../lib/errors";
+import { CameraError, logError } from "../lib/errors";
 
 interface CameraPermissionsProps {
   onPermissionGranted: () => void;
@@ -22,47 +22,30 @@ export const CameraPermissions: React.FC<CameraPermissionsProps> = ({ onPermissi
         throw new CameraError("Camera access is not supported in this browser", "NotSupportedError");
       }
 
-      // Try to access camera directly first (more reliable than permissions API)
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
+      // Query the current permission state without triggering the browser's
+      // camera prompt on mount. We only request the camera (getUserMedia) when
+      // the user explicitly clicks "Allow Camera Access".
+      if ("permissions" in navigator) {
+        const permission = await navigator.permissions.query({
+          name: "camera" as PermissionName,
         });
 
-        // If we get here, permission is granted
-        stream.getTracks().forEach((track) => track.stop()); // Clean up
-        console.log("Camera permission: granted (direct access)");
-        setPermissionState("granted");
-        onPermissionGranted();
-        return;
-      } catch (directAccessError) {
-        console.log("Direct camera access failed:", directAccessError);
-
-        // If direct access fails, check permissions API
-        if ("permissions" in navigator) {
-          const permission = await navigator.permissions.query({
-            name: "camera" as PermissionName,
-          });
-
-          console.log("Permission API state:", permission.state);
-
-          switch (permission.state) {
-            case "granted":
-              setPermissionState("granted");
-              onPermissionGranted();
-              break;
-            case "denied":
-              setPermissionState("denied");
-              onPermissionDenied();
-              break;
-            case "prompt":
-              setPermissionState("prompt");
-              break;
-          }
-        } else {
-          // Fallback for browsers that don't support permissions API
-
-          setPermissionState("prompt");
+        switch (permission.state) {
+          case "granted":
+            setPermissionState("granted");
+            onPermissionGranted();
+            break;
+          case "denied":
+            setPermissionState("denied");
+            onPermissionDenied();
+            break;
+          case "prompt":
+            setPermissionState("prompt");
+            break;
         }
+      } else {
+        // Fallback for browsers that don't support the permissions API.
+        setPermissionState("prompt");
       }
     } catch (err) {
       logError(err, { component: "CameraPermissions", step: "permission_check" });
@@ -87,41 +70,37 @@ export const CameraPermissions: React.FC<CameraPermissionsProps> = ({ onPermissi
       setError(null);
       setIsRetrying(true);
 
-      const stream = await retryWithBackoff(
-        async () => {
-          try {
-            return await navigator.mediaDevices.getUserMedia({
-              video: {
-                facingMode: "environment", // Prefer back camera for scanning
-              },
-            });
-          } catch (err) {
-            if (err instanceof Error) {
-              if (err.name === "NotAllowedError") {
-                throw new CameraError(
-                  "Camera access was denied. Please allow camera access to scan QR codes.",
-                  "NotAllowedError"
-                );
-              } else if (err.name === "NotFoundError") {
-                throw new CameraError("No camera found on this device.", "NotFoundError");
-              } else if (err.name === "NotSupportedError") {
-                throw new CameraError("Camera access is not supported in this browser.", "NotSupportedError");
-              } else if (err.name === "NotReadableError") {
-                throw new CameraError("Camera is already in use by another application.", "NotReadableError");
-              } else if (err.name === "OverconstrainedError") {
-                throw new CameraError("Camera constraints could not be satisfied.", "OverconstrainedError");
-              } else {
-                throw new CameraError("Failed to access camera. Please try again.");
-              }
-            } else {
-              throw new CameraError("An unknown error occurred while accessing the camera.");
-            }
+      // Request the camera. Permission errors (denied / no device) are not
+      // retryable, so we request once and surface the error immediately.
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment", // Prefer back camera for scanning
+          },
+        });
+      } catch (err) {
+        if (err instanceof Error) {
+          if (err.name === "NotAllowedError") {
+            throw new CameraError(
+              "Camera access was denied. Please allow camera access to scan QR codes.",
+              "NotAllowedError"
+            );
+          } else if (err.name === "NotFoundError") {
+            throw new CameraError("No camera found on this device.", "NotFoundError");
+          } else if (err.name === "NotSupportedError") {
+            throw new CameraError("Camera access is not supported in this browser.", "NotSupportedError");
+          } else if (err.name === "NotReadableError") {
+            throw new CameraError("Camera is already in use by another application.", "NotReadableError");
+          } else if (err.name === "OverconstrainedError") {
+            throw new CameraError("Camera constraints could not be satisfied.", "OverconstrainedError");
+          } else {
+            throw new CameraError("Failed to access camera. Please try again.");
           }
-        },
-        3,
-        1000,
-        { component: "CameraPermissions", step: "permission_request", attempt: retryCount + 1 }
-      );
+        } else {
+          throw new CameraError("An unknown error occurred while accessing the camera.");
+        }
+      }
 
       // Stop the stream immediately as we just needed to request permission
       stream.getTracks().forEach((track) => track.stop());

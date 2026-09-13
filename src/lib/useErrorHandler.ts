@@ -94,7 +94,7 @@ export function useErrorHandler(options: UseErrorHandlerOptions = {}) {
     error: errorState.error,
     isRetrying: errorState.isRetrying,
     retryCount: errorState.retryCount,
-    canRetry: errorState.error?.retryable && errorState.retryCount < maxRetries,
+    canRetry: Boolean(errorState.error?.retryable) && errorState.retryCount < maxRetries,
     handleError,
     clearError,
     retryOperation,

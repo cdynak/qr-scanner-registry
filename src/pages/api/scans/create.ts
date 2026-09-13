@@ -1,110 +1,93 @@
 import type { APIRoute } from "astro";
-import { createServerSupabaseClient } from "../../../db/supabase";
+import { createUserScopedClient } from "../../../db/supabase";
 import { validateScanCreateRequest } from "../../../lib/validation";
 import type { ApiResponse, Scan } from "../../../types";
-import { createApiErrorResponse, logError, retryWithBackoff } from "../../../lib/errors";
+import { ValidationError } from "../../../types";
+import { logError } from "../../../lib/errors";
 import { getClientIP } from "../../../lib/security";
 
 /**
+ * Builds a JSON Response with the given status.
+ */
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/**
  * POST /api/scans/create
- * Creates a new scan record for the authenticated user
+ * Creates a new scan record for the authenticated user.
  */
 export const POST: APIRoute = async ({ request, locals }) => {
+  // Require an authenticated user (guard clause).
+  const userId = locals.user?.id;
+  if (!userId) {
+    return jsonResponse({ error: "Authentication required", message: "You must be logged in to create scans" }, 401);
+  }
+
+  // Parse and validate the request body.
+  let validatedScan;
   try {
-    console.log("Scan save request received");
-
-    // Parse request body
-    const requestData = await request.json();
-    console.log("Scan data:", requestData);
-
-    // Validate request data
-    const validatedScan = validateScanCreateRequest(requestData);
-
-    // Try to save to database with fallback to mock response
+    let requestData: unknown;
     try {
-      console.log("Attempting to save scan to Supabase...");
-      
-      // Create Supabase client
-      const supabase = createServerSupabaseClient();
-      
-      // Save scan to database
-      const scan = await retryWithBackoff(
-        async () => {
-          const { data, error: insertError } = await supabase
-            .from("scans")
-            .insert({
-              user_id: locals.user?.id || crypto.randomUUID(),
-              content: validatedScan.content,
-              scan_type: validatedScan.scanType,
-              format: validatedScan.format || null,
-              scanned_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-
-          if (insertError) {
-            throw new Error(`Database insert failed: ${insertError.message}`);
-          }
-
-          return data;
-        },
-        3,
-        1000,
-        {
-          route: "/api/scans/create",
-          userId: locals.user?.id,
-          step: "database_operations",
-        }
-      );
-
-      console.log("✅ Scan saved to Supabase successfully");
-      
-      return new Response(
-        JSON.stringify({
-          data: scan,
-          message: "Scan created successfully",
-        } as ApiResponse<Scan>),
-        {
-          status: 201,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-      
-    } catch (dbError) {
-      console.log("❌ Database operation failed, using mock response:", dbError instanceof Error ? dbError.message : String(dbError));
-      
-      // Fallback to mock response if database operations fail
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Scan saved successfully (fallback mode)",
-          scan: {
-            id: crypto.randomUUID(),
-            ...requestData,
-            created_at: new Date().toISOString(),
-          },
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      requestData = await request.json();
+    } catch (parseError) {
+      if (parseError instanceof SyntaxError) {
+        return jsonResponse({ error: "Invalid JSON", message: "Request body must be valid JSON" }, 400);
+      }
+      throw parseError;
     }
 
+    validatedScan = validateScanCreateRequest(requestData);
   } catch (error) {
-    console.error("❌ Scan creation failed:", error);
-    
+    if (error instanceof ValidationError) {
+      return jsonResponse({ error: "Validation failed", message: error.message, field: error.field }, 400);
+    }
+
     logError(error, {
       route: "/api/scans/create",
-      userId: locals?.user?.id,
+      userId,
       method: "POST",
       clientIP: getClientIP(request),
     });
+    return jsonResponse({ error: "Internal server error", message: "An unexpected error occurred" }, 500);
+  }
 
-    const errorResponse = createApiErrorResponse(error);
-    return new Response(JSON.stringify(errorResponse), {
-      status: errorResponse.statusCode,
-      headers: { "Content-Type": "application/json" },
+  // Persist to the database as the current user (RLS enforces ownership).
+  try {
+    const supabase = createUserScopedClient(locals.session?.accessToken);
+
+    const { data, error: insertError } = await supabase
+      .from("scans")
+      .insert({
+        user_id: userId,
+        content: validatedScan.content,
+        scan_type: validatedScan.scanType,
+        format: validatedScan.format || null,
+        scanned_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      logError(new Error(`Database insert failed: ${insertError.message}`), {
+        route: "/api/scans/create",
+        userId,
+        step: "database_operations",
+      });
+      return jsonResponse({ error: "Database error", message: "Failed to save scan record" }, 500);
+    }
+
+    return jsonResponse({ data, message: "Scan created successfully" } as ApiResponse<Scan>, 201);
+  } catch (error) {
+    logError(error, {
+      route: "/api/scans/create",
+      userId,
+      method: "POST",
+      clientIP: getClientIP(request),
     });
+    return jsonResponse({ error: "Internal server error", message: "An unexpected error occurred" }, 500);
   }
 };

@@ -10,9 +10,6 @@ beforeAll(() => {
   process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
   process.env.GOOGLE_CLIENT_SECRET = "test-google-client-secret";
   process.env.NODE_ENV = "test";
-  
-  // Disable CSRF protection in tests
-  process.env.DISABLE_CSRF_IN_TESTS = "true";
 });
 
 // Cleanup after each test case

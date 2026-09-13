@@ -85,6 +85,7 @@ const mockSupabase = {
 
 vi.mock("../../../db/supabase", () => ({
   createClient: vi.fn().mockReturnValue(mockSupabase),
+  useMockDb: false,
 }));
 
 vi.mock("../../../lib/auth", () => ({
@@ -100,6 +101,7 @@ vi.mock("../../../lib/auth", () => ({
     maxAge: 3600,
     path: "/",
   }),
+  createSecureSessionCookie: vi.fn().mockReturnValue("session=mock; HttpOnly; SameSite=lax; Path=/"),
 }));
 
 // Import after mocks are set up
@@ -151,9 +153,7 @@ describe("Google OAuth API Route", () => {
 
   describe("POST /api/auth/google", () => {
     it("should handle successful OAuth callback for new user", async () => {
-      const mockResponse = {
-        headers: new Map(),
-      };
+      const mockResponse = { headers: new Headers() };
       const mockRedirect = vi.fn().mockReturnValue(mockResponse);
 
       const request = new Request("http://localhost:4321/api/auth/google?code=mock-auth-code");
@@ -186,9 +186,7 @@ describe("Google OAuth API Route", () => {
           error: null,
         });
 
-      const mockResponse = {
-        headers: new Map(),
-      };
+      const mockResponse = { headers: new Headers() };
       const mockRedirect = vi.fn().mockReturnValue(mockResponse);
 
       const request = new Request("http://localhost:4321/api/auth/google?code=mock-auth-code");

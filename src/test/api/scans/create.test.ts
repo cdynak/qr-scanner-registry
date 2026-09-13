@@ -17,6 +17,7 @@ const mockSupabaseClient = {
 // Mock the Supabase module
 vi.mock("../../../db/supabase", () => ({
   createServerSupabaseClient: () => mockSupabaseClient,
+  createUserScopedClient: () => mockSupabaseClient,
 }));
 
 // Mock validation functions

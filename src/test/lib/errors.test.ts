@@ -301,11 +301,14 @@ describe("retryWithBackoff", () => {
     const fn = vi.fn().mockRejectedValue(error);
 
     const promise = retryWithBackoff(fn, 2, 100);
+    // Attach the rejection expectation up front so the rejection is always
+    // considered handled (avoids a spurious unhandled-rejection warning).
+    const assertion = expect(promise).rejects.toThrow("Network error");
 
-    // Fast-forward timers
+    // Fast-forward timers so the backoff delays resolve.
     await vi.runAllTimersAsync();
 
-    await expect(promise).rejects.toThrow("Network error");
+    await assertion;
     expect(fn).toHaveBeenCalledTimes(2);
   });
 });

@@ -9,7 +9,12 @@ interface Migration {
 }
 
 // List of migration files in order
-const MIGRATION_FILES = ["001_create_users_table.sql", "002_create_scans_table.sql", "003_enable_rls_policies.sql"];
+const MIGRATION_FILES = [
+  "001_create_users_table.sql",
+  "002_create_scans_table.sql",
+  "003_enable_rls_policies.sql",
+  "004_fix_scans_schema.sql",
+];
 
 /**
  * Load migration files from the migrations directory

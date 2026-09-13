@@ -16,12 +16,10 @@ export function generateCSRFToken(): string {
   const randomToken = randomBytes(CSRF_TOKEN_LENGTH).toString("hex");
   const timestamp = Date.now().toString();
   const payload = `${randomToken}.${timestamp}`;
-  
+
   // Create HMAC signature
-  const signature = createHmac("sha256", CSRF_SECRET)
-    .update(payload)
-    .digest("hex");
-  
+  const signature = createHmac("sha256", CSRF_SECRET).update(payload).digest("hex");
+
   return `${payload}.${signature}`;
 }
 
@@ -40,12 +38,10 @@ export function validateCSRFToken(token: string): boolean {
 
   const [randomToken, timestamp, signature] = parts;
   const payload = `${randomToken}.${timestamp}`;
-  
+
   // Verify signature
-  const expectedSignature = createHmac("sha256", CSRF_SECRET)
-    .update(payload)
-    .digest("hex");
-  
+  const expectedSignature = createHmac("sha256", CSRF_SECRET).update(payload).digest("hex");
+
   if (signature !== expectedSignature) {
     return false;
   }
@@ -54,7 +50,7 @@ export function validateCSRFToken(token: string): boolean {
   const tokenTime = parseInt(timestamp, 10);
   const currentTime = Date.now();
   const maxAge = 60 * 60 * 1000; // 1 hour in milliseconds
-  
+
   if (currentTime - tokenTime > maxAge) {
     return false;
   }
@@ -94,23 +90,21 @@ export function getCSRFCookieOptions(isProduction = false) {
  */
 export function validateCSRFFromRequest(request: Request, cookieToken?: string): boolean {
   const requestToken = extractCSRFToken(request);
-  
+
   if (!requestToken || !cookieToken) {
     return false;
   }
 
   // Both tokens must be valid and match
-  return validateCSRFToken(requestToken) && 
-         validateCSRFToken(cookieToken) && 
-         requestToken === cookieToken;
+  return validateCSRFToken(requestToken) && validateCSRFToken(cookieToken) && requestToken === cookieToken;
 }
 
 /**
  * CSRF protection middleware for API routes
  */
 export function requireCSRFProtection(request: Request, csrfCookie?: string): void {
-  // Skip CSRF protection in test environment
-  if (process.env.NODE_ENV === "test" || process.env.DISABLE_CSRF_IN_TESTS === "true") {
+  // Explicit opt-out for specific test scenarios that need it.
+  if (process.env.DISABLE_CSRF_IN_TESTS === "true") {
     return;
   }
 

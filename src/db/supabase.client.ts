@@ -27,7 +27,7 @@ export const createClientSupabaseClient = (): SupabaseClient<Database> | null =>
           return fetch(url, {
             ...options,
             headers: {
-              'User-Agent': 'QR-Scanner-Registry/1.0',
+              "User-Agent": "QR-Scanner-Registry/1.0",
               ...options.headers,
             },
           });

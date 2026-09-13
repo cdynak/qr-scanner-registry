@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { UserProfile } from "./UserProfile";
 import { LoginButton } from "./LoginButton";
 import { LogoutButton } from "./LogoutButton";
-import { parseSessionFromCookie, getUserFromSession } from "../lib/auth";
+import { getCurrentUser } from "../db/supabase";
 import type { User } from "../types";
 
 interface NavigationProps {
@@ -17,32 +17,15 @@ const Navigation: React.FC<NavigationProps> = ({ className = "" }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const loadUser = () => {
+    // Ask the server who the current user is. The session cookie is HttpOnly,
+    // so it is never read from JavaScript here.
+    const loadUser = async () => {
       try {
-        // Get session from cookie
-        const cookies = document.cookie.split(";").reduce(
-          (acc, cookie) => {
-            const [key, value] = cookie.trim().split("=");
-            acc[key] = value;
-            return acc;
-          },
-          {} as Record<string, string>
-        );
-
-        const sessionCookie = cookies.session;
-
-        if (!sessionCookie) {
-          setUser(null);
-          setIsLoading(false);
-          return;
-        }
-
-        // Parse and validate session
-        const session = parseSessionFromCookie(decodeURIComponent(sessionCookie));
-        const user = getUserFromSession(session);
-
-        setUser(user);
+        const currentUser = (await getCurrentUser()) as User | null;
+        setUser(currentUser);
       } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("Failed to load user:", error);
         setUser(null);
       } finally {
         setIsLoading(false);

@@ -15,7 +15,7 @@ describe("CSRF Protection", () => {
   describe("generateCSRFToken", () => {
     it("should generate a valid CSRF token", () => {
       const token = generateCSRFToken();
-      
+
       expect(token).toBeDefined();
       expect(typeof token).toBe("string");
       expect(token.split(".")).toHaveLength(3);
@@ -24,7 +24,7 @@ describe("CSRF Protection", () => {
     it("should generate unique tokens", () => {
       const token1 = generateCSRFToken();
       const token2 = generateCSRFToken();
-      
+
       expect(token1).not.toBe(token2);
     });
   });
@@ -32,7 +32,7 @@ describe("CSRF Protection", () => {
   describe("validateCSRFToken", () => {
     it("should validate a valid token", () => {
       const token = generateCSRFToken();
-      
+
       expect(validateCSRFToken(token)).toBe(true);
     });
 
@@ -51,21 +51,21 @@ describe("CSRF Protection", () => {
       const token = generateCSRFToken();
       const parts = token.split(".");
       const tamperedToken = `${parts[0]}.${parts[1]}.invalid_signature`;
-      
+
       expect(validateCSRFToken(tamperedToken)).toBe(false);
     });
 
     it("should reject expired tokens", () => {
       // Mock Date.now to create an old token
       const originalNow = Date.now;
-      const oldTime = Date.now() - (2 * 60 * 60 * 1000); // 2 hours ago
-      
+      const oldTime = Date.now() - 2 * 60 * 60 * 1000; // 2 hours ago
+
       vi.spyOn(Date, "now").mockReturnValue(oldTime);
       const oldToken = generateCSRFToken();
-      
+
       // Restore current time
       Date.now = originalNow;
-      
+
       expect(validateCSRFToken(oldToken)).toBe(false);
     });
   });
@@ -127,13 +127,13 @@ describe("CSRF Protection", () => {
   describe("requireCSRFProtection", () => {
     it("should pass for safe methods", () => {
       const request = new Request("http://example.com", { method: "GET" });
-      
+
       expect(() => requireCSRFProtection(request)).not.toThrow();
     });
 
     it("should require CSRF for unsafe methods", () => {
       const request = new Request("http://example.com", { method: "POST" });
-      
+
       expect(() => requireCSRFProtection(request)).toThrow("CSRF token validation failed");
     });
 
@@ -145,7 +145,7 @@ describe("CSRF Protection", () => {
           "x-csrf-token": token,
         },
       });
-      
+
       expect(() => requireCSRFProtection(request, token)).not.toThrow();
     });
   });

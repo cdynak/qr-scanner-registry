@@ -88,6 +88,11 @@ export const IP_RATE_LIMITERS = {
  * Extracts client IP from request
  */
 export function getClientIP(request: Request): string {
+  // Guard against malformed request objects (e.g. during error handling).
+  if (!request || typeof request.headers?.get !== "function") {
+    return "unknown";
+  }
+
   // Check various headers for the real IP
   const headers = [
     "x-forwarded-for",

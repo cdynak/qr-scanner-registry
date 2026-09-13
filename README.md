@@ -15,7 +15,7 @@ A modern web application that allows users to authenticate with Google, scan QR 
 
 ## Prerequisites
 
-- Node.js v22.14.0 (as specified in `.nvmrc`)
+- Node.js v22.18.0 (as specified in `.nvmrc`)
 - npm (comes with Node.js)
 
 ## Getting Started
@@ -44,6 +44,21 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## Local / Offline Mode
+
+The app can run fully locally without a Supabase project or Google OAuth. Set the following in `.env`:
+
+```bash
+USE_MOCK_DB=true
+```
+
+With mock mode enabled:
+- Login skips Google and signs in a deterministic "Local Dev User".
+- Users and scans are stored in an in-memory database (reset when the dev server restarts).
+- No external network calls are made for auth or data.
+
+Leave `USE_MOCK_DB=false` (the default) to use the real Supabase project configured via `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`. When mock mode is off, database or auth failures surface as real errors rather than being silently masked.
 
 ## Available Scripts
 

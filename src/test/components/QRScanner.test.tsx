@@ -2,18 +2,36 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QRScanner } from "../../components/QRScanner";
 
-// Mock react-qr-barcode-scanner
+// Mock react-qr-barcode-scanner. The component imports the ESM build via the
+// subpath alias (react-qr-barcode-scanner/dist/BarcodeScanner.js) as a default
+// export, so mock that exact path with a default export.
+const { MockBarcodeScanner } = vi.hoisted(() => {
+  const MockBarcodeScanner = (props: any) => {
+    const onUpdate = props.onUpdate;
+    return (
+      <div data-testid="barcode-scanner">
+        <button
+          data-testid="mock-scan-success"
+          onClick={() => onUpdate(null, { getText: () => "https://example.com" })}
+        >
+          Mock Scan Success
+        </button>
+        <button data-testid="mock-scan-error" onClick={() => onUpdate(new Error("Scan failed"), null)}>
+          Mock Scan Error
+        </button>
+      </div>
+    );
+  };
+  return { MockBarcodeScanner };
+});
+
+vi.mock("react-qr-barcode-scanner/dist/BarcodeScanner.js", () => ({
+  default: MockBarcodeScanner,
+}));
+
 vi.mock("react-qr-barcode-scanner", () => ({
-  BarcodeScannerComponent: vi.fn(({ onUpdate, ...props }: any) => (
-    <div data-testid="barcode-scanner" {...props}>
-      <button data-testid="mock-scan-success" onClick={() => onUpdate(null, { getText: () => "https://example.com" })}>
-        Mock Scan Success
-      </button>
-      <button data-testid="mock-scan-error" onClick={() => onUpdate(new Error("Scan failed"), null)}>
-        Mock Scan Error
-      </button>
-    </div>
-  )),
+  BarcodeScannerComponent: MockBarcodeScanner,
+  default: MockBarcodeScanner,
 }));
 
 // Mock CameraPermissions component

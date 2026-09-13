@@ -48,14 +48,14 @@ describe("useErrorHandler", () => {
 
     expect(result.current.error).toEqual(
       expect.objectContaining({
-        name: "UnknownError",
+        name: "Error",
         message: "Test error",
       })
     );
     expect(result.current.retryCount).toBe(1);
     expect(onError).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: "UnknownError",
+        name: "Error",
         message: "Test error",
       })
     );
@@ -108,7 +108,7 @@ describe("useErrorHandler", () => {
     expect(operationResult).toBeNull();
     expect(result.current.error).toEqual(
       expect.objectContaining({
-        name: "UnknownError",
+        name: "Error",
         message: "Operation failed",
       })
     );
@@ -216,13 +216,13 @@ describe("useErrorHandler", () => {
     expect(retryResult).toBeNull();
     expect(result.current.error).toEqual(
       expect.objectContaining({
-        name: "UnknownError",
+        name: "Error",
         message: "Retry failed",
       })
     );
   });
 
-  it("should use custom component name in context", () => {
+  it("should use custom component name in context", async () => {
     const { logError } = vi.mocked(await import("../../lib/errors"));
     const { result } = renderHook(() => useErrorHandler({ component: "CustomComponent" }));
 

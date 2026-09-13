@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import type { AuthSession, User } from "../types";
+import type { User } from "../types";
 import { LoginButton } from "./LoginButton";
-import { getUserFromSession, parseSessionFromCookie } from "../lib/auth";
+import { getCurrentUser } from "../db/supabase";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -24,49 +24,14 @@ export function AuthGuard({ children, fallback, redirectTo, requireAuth = true }
   });
 
   useEffect(() => {
+    // Resolve auth state from the server. The session cookie is HttpOnly and
+    // never read from JavaScript.
     const checkAuth = async () => {
       try {
-        // Get session from cookie
-        const cookies = document.cookie.split(";").reduce(
-          (acc, cookie) => {
-            const [key, value] = cookie.trim().split("=");
-            acc[key] = value;
-            return acc;
-          },
-          {} as Record<string, string>
-        );
-
-        const sessionCookie = cookies.session;
-
-        console.log("Debug - Available cookies:", Object.keys(cookies));
-        console.log("Debug - Session cookie exists:", !!sessionCookie);
-        console.log("Debug - Raw session cookie:", sessionCookie?.substring(0, 100) + "...");
-
-        if (!sessionCookie) {
-          setAuthState({ user: null, loading: false, error: null });
-          return;
-        }
-
-        // Try to decode the session cookie
-        let decodedCookie;
-        try {
-          decodedCookie = decodeURIComponent(sessionCookie);
-          console.log("Debug - Decoded cookie:", decodedCookie.substring(0, 100) + "...");
-        } catch (error) {
-          console.error("Debug - Failed to decode cookie:", error);
-          setAuthState({ user: null, loading: false, error: "Failed to decode session cookie" });
-          return;
-        }
-
-        // Parse and validate session
-        const session = parseSessionFromCookie(decodedCookie);
-        console.log("Debug - Parsed session:", session);
-
-        const user = getUserFromSession(session);
-        console.log("Debug - Parsed user:", user);
-
+        const user = (await getCurrentUser()) as User | null;
         setAuthState({ user, loading: false, error: null });
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error("Auth check failed:", error);
         setAuthState({
           user: null,
@@ -140,25 +105,7 @@ export function useAuth(): AuthState & { isAuthenticated: boolean } {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const cookies = document.cookie.split(";").reduce(
-          (acc, cookie) => {
-            const [key, value] = cookie.trim().split("=");
-            acc[key] = value;
-            return acc;
-          },
-          {} as Record<string, string>
-        );
-
-        const sessionCookie = cookies.session;
-
-        if (!sessionCookie) {
-          setAuthState({ user: null, loading: false, error: null });
-          return;
-        }
-
-        const session = parseSessionFromCookie(decodeURIComponent(sessionCookie));
-        const user = getUserFromSession(session);
-
+        const user = (await getCurrentUser()) as User | null;
         setAuthState({ user, loading: false, error: null });
       } catch (error) {
         setAuthState({

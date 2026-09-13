@@ -42,8 +42,9 @@ export function LogoutButton({
         throw new Error(errorData.error || `Logout failed: ${response.status}`);
       }
 
-      // Clear any client-side auth state
-      // The server should have cleared the session cookie
+      // The server clears the HttpOnly session cookie. Clear the non-sensitive
+      // client-readable auth flag here so the UI updates immediately.
+      document.cookie = "authenticated=; Path=/; Max-Age=0; SameSite=Lax";
 
       onLogoutComplete?.();
 

@@ -98,7 +98,7 @@ describe("Authentication Security", () => {
 
       expect(cookieString).toContain("HttpOnly");
       expect(cookieString).toContain("Secure");
-      expect(cookieString).toContain("SameSite=strict");
+      expect(cookieString).toContain("SameSite=lax");
       expect(cookieString).toContain("Max-Age=3600");
       expect(cookieString).toContain("Path=/");
     });
@@ -109,7 +109,7 @@ describe("Authentication Security", () => {
 
       expect(cookieString).toContain("HttpOnly");
       expect(cookieString).not.toContain("Secure");
-      expect(cookieString).toContain("SameSite=strict");
+      expect(cookieString).toContain("SameSite=lax");
     });
 
     it("should properly encode session data", () => {
@@ -131,7 +131,7 @@ describe("Authentication Security", () => {
 
       expect(options.httpOnly).toBe(true);
       expect(options.secure).toBe(true);
-      expect(options.sameSite).toBe("strict");
+      expect(options.sameSite).toBe("lax");
       expect(options.maxAge).toBe(3600);
       expect(options.path).toBe("/");
     });
@@ -141,7 +141,7 @@ describe("Authentication Security", () => {
 
       expect(options.httpOnly).toBe(true);
       expect(options.secure).toBe(false);
-      expect(options.sameSite).toBe("strict");
+      expect(options.sameSite).toBe("lax");
     });
   });
 

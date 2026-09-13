@@ -2,7 +2,7 @@ import { defineMiddleware } from "astro:middleware";
 import type { AuthSession } from "../types";
 import { isSessionValid, validateSessionCookie } from "../lib/auth";
 import { logError, createApiErrorResponse, setupGlobalErrorHandling } from "../lib/errors";
-import { generateCSRFToken, getCSRFCookieOptions } from "../lib/csrf";
+import { generateCSRFToken, getCSRFCookieOptions, validateCSRFFromRequest } from "../lib/csrf";
 import { applySecurityHeaders, getClientIP } from "../lib/security";
 import { createServerSupabaseClient } from "../db/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -95,6 +95,21 @@ export const onRequest = defineMiddleware(async (context, next) => {
       // For API routes, get CSRF token from cookie
       const csrfCookie = context.cookies.get("csrf-token");
       context.locals.csrfToken = csrfCookie?.value;
+
+      // Enforce CSRF on state-changing API requests (double-submit cookie).
+      // The OAuth endpoints are excluded: they are top-level browser
+      // navigations/redirects that cannot carry a custom CSRF header.
+      const unsafeMethods = ["POST", "PUT", "PATCH", "DELETE"];
+      const isAuthFlow = context.url.pathname.startsWith("/api/auth/");
+      if (unsafeMethods.includes(context.request.method) && !isAuthFlow) {
+        if (!validateCSRFFromRequest(context.request, context.locals.csrfToken)) {
+          const response = new Response(
+            JSON.stringify({ error: "CSRF token validation failed", message: "Invalid or missing CSRF token" }),
+            { status: 403, headers: { "Content-Type": "application/json" } }
+          );
+          return applySecurityHeaders(response, isProduction);
+        }
+      }
     }
 
     const response = await next();

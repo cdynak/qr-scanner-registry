@@ -17,7 +17,12 @@ Make sure to set the following environment variables:
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+# Optional but recommended: enables true DB-level Row Level Security.
+SUPABASE_JWT_SECRET=your-supabase-jwt-secret
 ```
+
+Set `USE_MOCK_DB=true` to run entirely against an in-memory store (no Supabase
+needed for local development).
 
 ## Database Schema
 
@@ -43,11 +48,27 @@ Stores QR/barcode scan results:
 
 ## Row Level Security (RLS)
 
-The database uses Row Level Security to ensure users can only access their own data:
+The database uses Row Level Security so users can only access their own data:
 
 - Users can only view, insert, and update their own profile
 - Users can only view, insert, update, and delete their own scans
-- All policies are based on the authenticated user's ID
+- Policies are keyed on `auth.uid() = user_id`
+
+### How RLS is enforced at the DB layer
+
+This app authenticates with custom Google OAuth (not Supabase Auth). To make
+the `auth.uid()`-based policies actually apply, the server mints a
+Supabase-compatible per-user JWT (`sub = user.id`, `role = authenticated`)
+signed with `SUPABASE_JWT_SECRET` (see `src/lib/supabase-jwt.ts`). Scan
+routes then use `createUserScopedClient(session.accessToken)`, which sends
+that JWT via the anon key so PostgREST evaluates RLS as the user.
+
+- With `SUPABASE_JWT_SECRET` set: RLS is enforced at the database.
+- Without it: the routes fall back to the service-role client (which bypasses
+  RLS); ownership is still enforced in the route handlers as defense in depth.
+
+The initial user upsert during OAuth uses the service-role client, because no
+session exists yet at that point.
 
 ## Running Migrations
 
@@ -67,6 +88,11 @@ This will:
 1. `001_create_users_table.sql` - Creates users table with indexes and triggers
 2. `002_create_scans_table.sql` - Creates scans table with indexes and constraints
 3. `003_enable_rls_policies.sql` - Enables RLS and creates security policies
+4. `004_fix_scans_schema.sql` - Recreates the scans table to match the app
+   schema (scan_type / format / scanned_at) and re-applies its RLS policies
+
+> Note: `migrate.ts` requires an `exec_sql` RPC in the database. If that is not
+> available, run the migration SQL directly in the Supabase SQL editor.
 
 ## Usage Examples
 
