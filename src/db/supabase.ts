@@ -13,7 +13,13 @@ const supabaseServiceRoleKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
  * local development, not a silent fallback — real failures still surface when
  * the flag is off.
  */
-export const useMockDb = (import.meta.env.USE_MOCK_DB ?? import.meta.env.PUBLIC_USE_MOCK_DB) === "true";
+// Astro coerces "true"/"false" env values to booleans, so accept both forms.
+// process.env is the fallback for a flag passed on the shell (Playwright, CI).
+const mockDbFlag: unknown =
+  import.meta.env.USE_MOCK_DB ??
+  import.meta.env.PUBLIC_USE_MOCK_DB ??
+  (typeof process !== "undefined" ? process.env.USE_MOCK_DB : undefined);
+export const useMockDb = mockDbFlag === true || mockDbFlag === "true";
 
 // Only validate on server side or when actually needed (skip in mock mode).
 const isServer = typeof window === "undefined";

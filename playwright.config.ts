@@ -49,7 +49,10 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
     env: {
       // Run against the in-memory store so E2E needs no external services.
+      // Astro only exposes shell-provided variables to `import.meta.env` when
+      // they are PUBLIC_-prefixed, so set both spellings (the app reads either).
       USE_MOCK_DB: "true",
+      PUBLIC_USE_MOCK_DB: "true",
     },
   },
 });

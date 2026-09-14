@@ -9,7 +9,7 @@ export default defineConfig(
       globals: true,
       coverage: {
         provider: "v8",
-        reporter: ["text", "json", "html"],
+        reporter: ["text", "json", "json-summary", "html"],
         exclude: [
           "node_modules/",
           "dist/",
@@ -19,14 +19,18 @@ export default defineConfig(
           "**/*.config.*",
           "**/test/**",
           "**/e2e/**",
+          "scripts/**",
+          "*.cjs",
+          "src/pages/**/*.astro",
+          "src/layouts/**",
+          "src/components/**/*.astro",
+          "src/db/migrate.ts",
         ],
-        threshold: {
-          global: {
-            branches: 80,
-            functions: 80,
-            lines: 80,
-            statements: 80,
-          },
+        thresholds: {
+          branches: 80,
+          functions: 80,
+          lines: 80,
+          statements: 80,
         },
       },
       include: ["src/**/*.{test,spec}.{js,ts,tsx}"],
