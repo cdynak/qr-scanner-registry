@@ -7,7 +7,6 @@ import { randomBytes, createHmac } from "crypto";
 const CSRF_SECRET = process.env.CSRF_SECRET || "default-csrf-secret-change-in-production";
 const CSRF_TOKEN_LENGTH = 32;
 const CSRF_HEADER_NAME = "x-csrf-token";
-const CSRF_COOKIE_NAME = "csrf-token";
 
 /**
  * Generates a cryptographically secure CSRF token

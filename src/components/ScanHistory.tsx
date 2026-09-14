@@ -30,7 +30,12 @@ function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close dialog"
+        className="fixed inset-0 bg-black/50 cursor-default"
+        onClick={onClose}
+      />
       <div className="relative bg-background border rounded-lg shadow-lg max-w-md w-full mx-4 p-6">
         <h3 className="text-lg font-semibold mb-2">{title}</h3>
         <p className="text-muted-foreground mb-6">{message}</p>
@@ -93,10 +98,11 @@ export function ScanHistory({ className }: ScanHistoryProps) {
       }
 
       if (data.data) {
+        const fetched = data.data;
         if (currentFilters.offset === 0) {
-          setScans(data.data);
+          setScans(fetched);
         } else {
-          setScans((prev) => [...prev, ...data.data!]);
+          setScans((prev) => [...prev, ...fetched]);
         }
       }
 

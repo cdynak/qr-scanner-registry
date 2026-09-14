@@ -206,10 +206,14 @@ export function sanitizeString(input: string): string {
     return "";
   }
 
-  return input
-    .trim()
-    .replace(/[\x00-\x1F\x7F]/g, "") // Remove control characters
-    .replace(/\s+/g, " "); // Normalize whitespace
+  return (
+    input
+      .trim()
+      // Intentionally strip ASCII control characters as part of sanitization.
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x1F\x7F]/g, "")
+      .replace(/\s+/g, " ")
+  ); // Normalize whitespace
 }
 
 /**
@@ -281,8 +285,8 @@ export function containsSQLInjection(input: string): boolean {
     /(--|\/\*|\*\/)/,
     /(\bOR\b\s+\d+\s*=\s*\d+)/i,
     /(\bAND\b\s+\d+\s*=\s*\d+)/i,
-    /([\'\"];?\s*(OR|AND)\s*[\'\"]?\w+[\'\"]?\s*=\s*[\'\"]?\w+)/i,
-    /(\'\s*OR\s*\'\w*\'\s*=\s*'\w*)/i,
+    /(['"];?\s*(OR|AND)\s*['"]?\w+['"]?\s*=\s*['"]?\w+)/i,
+    /('\s*OR\s*'\w*'\s*=\s*'\w*)/i,
   ];
 
   return sqlPatterns.some((pattern) => pattern.test(input));

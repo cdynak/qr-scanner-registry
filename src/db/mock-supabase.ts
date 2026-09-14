@@ -16,7 +16,7 @@ import type { Database } from "./types";
  * a silent fallback: it is only active when the flag is set.
  */
 
-type Row = Record<string, any>;
+type Row = Record<string, unknown>;
 
 // Module-level stores shared across all mock client instances.
 const stores: Record<string, Row[]> = {
@@ -177,7 +177,9 @@ class MockQuery implements PromiseLike<{ data: unknown; error: unknown; count?: 
 
   // Thenable so `await query` works like the real Supabase builder.
   then<TResult1 = { data: unknown; error: unknown; count?: number }, TResult2 = never>(
-    onfulfilled?: ((value: { data: unknown; error: unknown; count?: number }) => TResult1 | PromiseLike<TResult1>) | null,
+    onfulfilled?:
+      | ((value: { data: unknown; error: unknown; count?: number }) => TResult1 | PromiseLike<TResult1>)
+      | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): PromiseLike<TResult1 | TResult2> {
     try {

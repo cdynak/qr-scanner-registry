@@ -2,7 +2,7 @@ import React, { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { AlertTriangle, RefreshCw, Home, Bug } from "lucide-react";
 import { Button } from "./ui/button";
-import { logError, createErrorInfo } from "../lib/errors";
+import { logError } from "../lib/errors";
 
 interface Props {
   children: ReactNode;
@@ -134,7 +134,7 @@ class GlobalErrorBoundary extends Component<Props, State> {
             <div className="space-y-3">
               <h1 className="text-3xl font-bold text-foreground">Oops! Something went wrong</h1>
               <p className="text-lg text-muted-foreground">
-                We're sorry, but something unexpected happened. Our team has been notified and is working on a fix.
+                We&apos;re sorry, but something unexpected happened. Our team has been notified and is working on a fix.
               </p>
               {this.state.errorId && (
                 <p className="text-sm text-muted-foreground font-mono bg-muted p-2 rounded">

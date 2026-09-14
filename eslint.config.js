@@ -56,11 +56,44 @@ const reactConfig = tseslint.config({
   },
 });
 
+// Test files legitimately use `any` for mocks and `console` for debugging.
+const testOverrides = tseslint.config({
+  files: ["**/*.test.{ts,tsx}", "src/test/**/*.{ts,tsx}", "e2e/**/*.{ts,tsx}"],
+  rules: {
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-non-null-assertion": "off",
+    "@typescript-eslint/no-unused-vars": "off",
+    "@typescript-eslint/no-empty-function": "off",
+    "no-console": "off",
+  },
+});
+
+// Standalone Node scripts run outside the app and use console + Node globals.
+const scriptsOverrides = tseslint.config({
+  files: ["scripts/**/*.{js,mjs,cjs}", "*.config.{js,mjs,cjs,ts}", "*.cjs", "lighthouserc.js"],
+  languageOptions: {
+    globals: {
+      process: "readonly",
+      console: "readonly",
+      module: "readonly",
+      require: "readonly",
+      __dirname: "readonly",
+      fetch: "readonly",
+    },
+  },
+  rules: {
+    "no-console": "off",
+    "no-undef": "off",
+  },
+});
+
 export default tseslint.config(
   includeIgnoreFile(gitignorePath),
   baseConfig,
   jsxA11yConfig,
   reactConfig,
   eslintPluginAstro.configs["flat/recommended"],
-  eslintPluginPrettier
+  eslintPluginPrettier,
+  testOverrides,
+  scriptsOverrides
 );

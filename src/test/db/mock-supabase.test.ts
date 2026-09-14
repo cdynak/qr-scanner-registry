@@ -49,12 +49,7 @@ describe("mock Supabase client", () => {
     const db = createMockSupabaseClient();
     await db.from("users").insert({ google_id: "g1", email: "a@b.c", name: "Old" }).select().single();
 
-    const { data } = await db
-      .from("users")
-      .update({ name: "New" })
-      .eq("google_id", "g1")
-      .select()
-      .single();
+    const { data } = await db.from("users").update({ name: "New" }).eq("google_id", "g1").select().single();
 
     expect((data as any).name).toBe("New");
   });

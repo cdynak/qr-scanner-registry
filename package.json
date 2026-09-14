@@ -17,14 +17,9 @@
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "e2e:debug": "playwright test --debug",
-    "e2e:infrastructure": "node scripts/test-e2e.js infrastructure",
-    "e2e:auth": "node scripts/test-e2e.js auth",
-    "e2e:scanner": "node scripts/test-e2e.js scanner",
-    "e2e:history": "node scripts/test-e2e.js history",
-    "e2e:workflow": "node scripts/test-e2e.js workflow",
-    "e2e:smoke": "node scripts/test-e2e.js smoke",
-    "e2e:cross-browser": "node scripts/test-e2e.js cross-browser",
-    "e2e:mobile": "node scripts/test-e2e.js mobile",
+    "e2e:smoke": "playwright test e2e/smoke.spec.ts",
+    "e2e:infrastructure": "playwright test e2e/basic-infrastructure.spec.ts",
+    "e2e:report": "playwright show-report",
     "db:migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {

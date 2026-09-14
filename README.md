@@ -71,17 +71,12 @@ Leave `USE_MOCK_DB=false` (the default) to use the real Supabase project configu
 - `npm run test:watch` - Run unit tests in watch mode
 - `npm run test:ui` - Run unit tests with UI
 - `npm run test:coverage` - Run unit tests with coverage report
-- `npm run e2e` - Run end-to-end tests
-- `npm run e2e:ui` - Run end-to-end tests with UI
+- `npm run e2e` - Run end-to-end tests (auto-starts the dev server in mock mode)
+- `npm run e2e:smoke` - Run the unauthenticated smoke tests
+- `npm run e2e:infrastructure` - Run Playwright harness checks (no server)
+- `npm run e2e:ui` - Run end-to-end tests with the Playwright UI
 - `npm run e2e:debug` - Run end-to-end tests in debug mode
-- `npm run e2e:infrastructure` - Run infrastructure E2E tests
-- `npm run e2e:auth` - Run authentication E2E tests
-- `npm run e2e:scanner` - Run scanner E2E tests
-- `npm run e2e:history` - Run scan history E2E tests
-- `npm run e2e:workflow` - Run user workflow E2E tests
-- `npm run e2e:smoke` - Run smoke E2E tests
-- `npm run e2e:cross-browser` - Run cross-browser E2E tests
-- `npm run e2e:mobile` - Run mobile E2E tests
+- `npm run e2e:report` - Open the last HTML report
 
 ## CI/CD Pipeline
 

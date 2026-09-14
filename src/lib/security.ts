@@ -1,6 +1,6 @@
 import { RateLimiter } from "./errors";
 import { generateCSRFToken, validateCSRFFromRequest, getCSRFCookieOptions } from "./csrf";
-import { sanitizeUserInput, containsSQLInjection, containsXSS } from "./validation";
+import { containsSQLInjection, containsXSS } from "./validation";
 
 /**
  * Security utilities and middleware for the application
@@ -48,11 +48,12 @@ class IPRateLimiter {
   }
 
   canMakeRequest(ip: string): boolean {
-    if (!this.ipLimiters.has(ip)) {
-      this.ipLimiters.set(ip, new RateLimiter(this.maxRequests, this.windowMs));
+    let limiter = this.ipLimiters.get(ip);
+    if (!limiter) {
+      limiter = new RateLimiter(this.maxRequests, this.windowMs);
+      this.ipLimiters.set(ip, limiter);
     }
 
-    const limiter = this.ipLimiters.get(ip)!;
     return limiter.canMakeRequest();
   }
 
@@ -63,7 +64,6 @@ class IPRateLimiter {
 
   private cleanup(): void {
     // Remove limiters that haven't been used recently
-    const now = Date.now();
     for (const [ip, limiter] of this.ipLimiters.entries()) {
       if (limiter.getTimeUntilReset() === 0) {
         this.ipLimiters.delete(ip);
@@ -265,7 +265,7 @@ export class SecurityMiddleware {
             };
           }
         }
-      } catch (error) {
+      } catch {
         return {
           success: false,
           error: "Invalid request body",

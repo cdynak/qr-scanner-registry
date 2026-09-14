@@ -6,6 +6,7 @@ dist/
 
 # test results
 test-results/
+playwright-report/
 
 # generated types
 .astro/
