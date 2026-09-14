@@ -1,6 +1,9 @@
 # build output
 dist/
 
+# vercel build output
+.vercel/
+
 # test results
 test-results/
 

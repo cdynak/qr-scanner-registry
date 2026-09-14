@@ -31,6 +31,7 @@
     "@astrojs/node": "^9.5.5",
     "@astrojs/react": "4.2.2",
     "@astrojs/sitemap": "3.3.0",
+    "@astrojs/vercel": "^8.2.11",
     "@google-cloud/local-auth": "^3.0.1",
     "@radix-ui/react-slot": "^1.1.2",
     "@supabase/supabase-js": "^2.55.0",
