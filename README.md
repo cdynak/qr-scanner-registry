@@ -1,53 +1,50 @@
 # QR Scanner Registry
 
-[![CI](https://github.com/your-username/qr-scanner-registry/workflows/CI/badge.svg)](https://github.com/your-username/qr-scanner-registry/actions/workflows/ci.yml)
-[![Main Branch](https://github.com/your-username/qr-scanner-registry/workflows/Main%20Branch%20CI%2FCD/badge.svg)](https://github.com/your-username/qr-scanner-registry/actions/workflows/main.yml)
-[![codecov](https://codecov.io/gh/your-username/qr-scanner-registry/branch/main/graph/badge.svg)](https://codecov.io/gh/your-username/qr-scanner-registry)
+[![CI](https://github.com/cdynak/qr-scanner-registry/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/cdynak/qr-scanner-registry/actions/workflows/ci.yml)
+[![Main Branch CI/CD](https://github.com/cdynak/qr-scanner-registry/actions/workflows/main.yml/badge.svg?branch=master)](https://github.com/cdynak/qr-scanner-registry/actions/workflows/main.yml)
 
-A modern web application that allows users to authenticate with Google, scan QR codes and barcodes using their device camera, and store scan results in a database.
+Scan QR codes and barcodes with your device camera, and keep the results in a personal, Google-authenticated scan history.
+
+**Live app:** <https://qr-scanner-registry.vercel.app/>
+
+## Features
+
+- **Google sign-in** – OAuth 2.0 login; sessions are kept in an HttpOnly cookie.
+- **Camera scanning** – live camera feed with automatic QR / barcode detection, camera-permission handling, and retry on failure.
+- **Scan registry** – every scan is saved to Supabase with its content, format, type and timestamp; scans are private per user (Row Level Security).
+- **History** – paginated list of previous scans with delete (with confirmation).
+- **Offline/mock mode** – run the whole app with an in-memory store and no external services.
 
 ## Tech Stack
 
-- [Astro](https://astro.build/) v5.5.5 - Modern web framework for building fast, content-focused websites
-- [React](https://react.dev/) v19.0.0 - UI library for building interactive components
-- [TypeScript](https://www.typescriptlang.org/) v5 - Type-safe JavaScript
-- [Tailwind CSS](https://tailwindcss.com/) v4.0.17 - Utility-first CSS framework
+- [Astro](https://astro.build/) 5 (server-rendered) with [React](https://react.dev/) 19 islands
+- [TypeScript](https://www.typescriptlang.org/) 5
+- [Tailwind CSS](https://tailwindcss.com/) 4 with shadcn/ui-style components
+- [Supabase](https://supabase.com/) (Postgres + RLS) for storage, Google OAuth for identity
+- [react-qr-barcode-scanner](https://github.com/jamenamcinteer/react-qr-barcode-scanner) for camera decoding
+- [Vitest](https://vitest.dev/) + Testing Library for unit/integration tests, [Playwright](https://playwright.dev/) for E2E
+- GitHub Actions for CI, [Vercel](https://vercel.com/) for hosting
 
 ## Prerequisites
 
-- Node.js v22.18.0 (as specified in `.nvmrc`)
-- npm (comes with Node.js)
+- Node.js 22.18.0 (see `.nvmrc`; `nvm use` picks it up)
+- npm
 
 ## Getting Started
 
-1. Clone the repository:
-
 ```bash
-git clone https://github.com/przeprogramowani/10x-astro-starter.git
-cd 10x-astro-starter
-```
-
-2. Install dependencies:
-
-```bash
+git clone https://github.com/cdynak/qr-scanner-registry.git
+cd qr-scanner-registry
 npm install
+cp .env.example .env   # fill in Supabase + Google OAuth values, or enable mock mode (below)
+npm run dev            # https://localhost:3000 (self-signed certificate)
 ```
 
-3. Run the development server:
+The dev server runs over HTTPS because browsers only expose the camera on secure origins.
 
-```bash
-npm run dev
-```
+### Local / offline mode
 
-4. Build for production:
-
-```bash
-npm run build
-```
-
-## Local / Offline Mode
-
-The app can run fully locally without a Supabase project or Google OAuth. Set the following in `.env`:
+The app can run without a Supabase project or Google OAuth. Set this in `.env`:
 
 ```bash
 USE_MOCK_DB=true
@@ -56,107 +53,74 @@ USE_MOCK_DB=true
 With mock mode enabled:
 
 - Login skips Google and signs in a deterministic "Local Dev User".
-- Users and scans are stored in an in-memory database (reset when the dev server restarts).
+- Users and scans live in an in-memory database (reset when the dev server restarts).
 - No external network calls are made for auth or data.
 
-Leave `USE_MOCK_DB=false` (the default) to use the real Supabase project configured via `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`. When mock mode is off, database or auth failures surface as real errors rather than being silently masked.
+Leave `USE_MOCK_DB` unset or `false` to use the real Supabase project configured via `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`. See `src/db/README.md` for the schema and migrations, and [DEPLOYMENT.md](DEPLOYMENT.md) for deploying to Vercel.
 
 ## Available Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-- `npm run lint:fix` - Fix ESLint issues
-- `npm run test` - Run unit tests
-- `npm run test:watch` - Run unit tests in watch mode
-- `npm run test:ui` - Run unit tests with UI
-- `npm run test:coverage` - Run unit tests with coverage report
-- `npm run e2e` - Run end-to-end tests (auto-starts the dev server in mock mode)
-- `npm run e2e:smoke` - Run the unauthenticated smoke tests
-- `npm run e2e:infrastructure` - Run Playwright harness checks (no server)
-- `npm run e2e:ui` - Run end-to-end tests with the Playwright UI
-- `npm run e2e:debug` - Run end-to-end tests in debug mode
-- `npm run e2e:report` - Open the last HTML report
+| Script                       | Description                                                   |
+| ---------------------------- | ------------------------------------------------------------- |
+| `npm run dev`                | Start the development server                                  |
+| `npm run build`              | Build for production                                          |
+| `npm run preview`            | Preview the production build                                  |
+| `npm run lint`               | Run ESLint (`lint:fix` to auto-fix)                           |
+| `npm run format`             | Format the repo with Prettier (`format:check` to verify only) |
+| `npm test`                   | Run unit tests once (`test:watch`, `test:ui` also available)  |
+| `npm run test:coverage`      | Unit tests with coverage (80% thresholds enforced)            |
+| `npm run e2e`                | Run Playwright E2E tests (starts the app in mock mode)        |
+| `npm run e2e:smoke`          | Unauthenticated smoke tests only                              |
+| `npm run e2e:infrastructure` | Playwright harness self-checks (no server)                    |
+| `npm run e2e:ui`             | Playwright UI mode                                            |
+| `npm run e2e:report`         | Open the last Playwright HTML report                          |
+| `npm run db:migrate`         | Apply the SQL migrations in `src/db/migrations`               |
 
-## CI/CD Pipeline
+## Testing
 
-This project uses GitHub Actions for continuous integration and deployment:
+- **Unit / integration** (`src/test/`) – components, utilities, middleware and every API route, with Supabase and Google OAuth mocked. Coverage thresholds (80% lines/branches/functions/statements) are enforced by `npm run test:coverage`.
+- **End-to-end** (`e2e/`) – Playwright runs against the dev server in mock mode on Desktop Chrome, Desktop Firefox and Mobile Chrome. See `e2e/README.md` for the scope.
 
-### Workflows
+## CI/CD
 
-- **CI (`ci.yml`)** - Runs on every push and pull request
-  - Linting and code formatting checks
-  - Unit tests with coverage reporting
-  - Build verification
-  - E2E smoke tests for PRs
-  - Security audit
+GitHub Actions workflows live in `.github/workflows/`:
 
-- **Pull Request Checks (`pr-checks.yml`)** - Validates PRs before merge
-  - Comprehensive validation including merge conflict detection
-  - Coverage threshold enforcement (80% minimum)
-  - Automated PR comments with test results
-  - Blocks merging on test failures
+- **CI** (`ci.yml`) – on every push and pull request to `master`: lint + format check, unit tests with coverage on Node 22.18.0 and 22.x, production build, Playwright E2E, and a non-blocking `npm audit`.
+- **Pull Request Checks** (`pr-checks.yml`) – merge-conflict detection, coverage-threshold gate, build, smoke E2E, and an automated PR comment with the results.
+- **Main Branch CI/CD** (`main.yml`) – full suite on every push to `master`, with test artifacts retained for 30 days.
+- **Nightly** (`nightly.yml`) – scheduled matrix over Node 20/22 and Chromium/Firefox, plus Lighthouse and security scanning.
 
-- **Main Branch (`main.yml`)** - Runs on main branch updates
-  - Full test suite including comprehensive E2E tests
-  - Cross-browser testing
-  - Test result artifacts with 30-day retention
-  - Failure notifications
-
-- **Nightly (`nightly.yml`)** - Scheduled comprehensive testing
-  - Multi-version Node.js testing (20.x, 22.x, 22.18.0)
-  - Cross-browser E2E testing
-  - Performance testing with Lighthouse
-  - Security scanning
-
-### Test Coverage
-
-The project maintains a minimum of 80% test coverage across:
-
-- Unit tests for all components and utilities
-- Integration tests for API endpoints
-- End-to-end tests for complete user workflows
+Deployments to Vercel happen automatically on every push to `master` (see [DEPLOYMENT.md](DEPLOYMENT.md)).
 
 ## Project Structure
 
 ```md
 .
+├── .kiro/
+│ ├── specs/qr-scanner-registry/ # requirements.md, design.md, tasks.md
+│ └── steering/ # coding guidelines used by the AI agent
+├── .github/workflows/ # CI/CD pipelines
+├── e2e/ # Playwright tests
 ├── src/
+│ ├── components/ # React + Astro UI components
+│ ├── db/ # Supabase client, mock store, migrations
 │ ├── layouts/ # Astro layouts
-│ ├── pages/ # Astro pages
-│ │ └── api/ # API endpoints
-│ ├── components/ # UI components (Astro & React)
-│ └── assets/ # Static assets
-├── public/ # Public assets
+│ ├── lib/ # auth, CSRF, validation, error utilities
+│ ├── middleware/ # session + security middleware
+│ ├── pages/ # Astro pages and /api routes
+│ └── test/ # Vitest suites
+└── public/ # Static assets
 ```
 
-## AI Development Support
+## Development Workflow
 
-This project is configured with AI development tools to enhance the development experience, providing guidelines for:
+The project was built spec-first with an AI coding agent (Kiro):
 
-- Project structure
-- Coding practices
-- Frontend development
-- Styling with Tailwind
-- Accessibility best practices
-- Astro and React guidelines
+1. `.kiro/specs/qr-scanner-registry/requirements.md` – user stories with acceptance criteria.
+2. `.kiro/specs/qr-scanner-registry/design.md` – architecture, data model, API and testing strategy.
+3. `.kiro/specs/qr-scanner-registry/tasks.md` – the implementation plan, executed task by task (each `feat(kiro): N.` commit maps to a task).
 
-### Cursor IDE
-
-The project includes AI rules in `.cursor/rules/` directory that help Cursor IDE understand the project structure and provide better code suggestions.
-
-### GitHub Copilot
-
-AI instructions for GitHub Copilot are available in `.github/copilot-instructions.md`
-
-### Windsurf
-
-The `.windsurfrules` file contains AI configuration for Windsurf.
-
-## Contributing
-
-Please follow the AI guidelines and coding practices defined in the AI configuration files when contributing to this project.
+`.kiro/steering/` holds the coding guidelines the agent follows (Astro, React, Supabase, shadcn/ui, testing). The same rules are mirrored for Cursor (`.cursor/rules/`), GitHub Copilot (`.github/copilot-instructions.md`) and Windsurf (`.windsurfrules`).
 
 ## License
 

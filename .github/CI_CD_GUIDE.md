@@ -10,7 +10,7 @@ The CI/CD pipeline is built using GitHub Actions and provides automated testing,
 
 ### 1. CI Workflow (`ci.yml`)
 
-**Triggers:** Push to `main`/`develop` branches, Pull Requests
+**Triggers:** Push to `master` branch, Pull Requests
 
 **Jobs:**
 
@@ -47,7 +47,7 @@ The CI/CD pipeline is built using GitHub Actions and provides automated testing,
 
 ### 3. Main Branch Workflow (`main.yml`)
 
-**Triggers:** Push to `main` branch
+**Triggers:** Push to `master` branch
 
 **Features:**
 
@@ -79,7 +79,7 @@ The CI/CD pipeline is built using GitHub Actions and provides automated testing,
 
 ## Branch Protection
 
-The following branch protection rules should be configured for the `main` branch:
+The following branch protection rules should be configured for the `master` branch:
 
 ### Required Status Checks
 

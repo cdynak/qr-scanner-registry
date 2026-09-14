@@ -1,6 +1,6 @@
 # Branch Protection Configuration
 
-To ensure code quality and prevent broken code from being merged, configure the following branch protection rules for the `main` branch:
+To ensure code quality and prevent broken code from being merged, configure the following branch protection rules for the `master` branch:
 
 ## Required Status Checks
 
@@ -50,7 +50,7 @@ For production deployments, consider adding:
 
 ```bash
 # Enable branch protection
-gh api repos/:owner/:repo/branches/main/protection \
+gh api repos/:owner/:repo/branches/master/protection \
   --method PUT \
   --field required_status_checks='{"strict":true,"contexts":["lint","test (22.18.0)","test (22.x)","build","pr-validation","pr-ready"]}' \
   --field enforce_admins=true \
