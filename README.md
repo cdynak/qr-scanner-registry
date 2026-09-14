@@ -94,22 +94,22 @@ Deployments to Vercel happen automatically on every push to `master` (see [DEPLO
 
 ## Project Structure
 
-```md
+```text
 .
 ├── .kiro/
-│ ├── specs/qr-scanner-registry/ # requirements.md, design.md, tasks.md
-│ └── steering/ # coding guidelines used by the AI agent
-├── .github/workflows/ # CI/CD pipelines
-├── e2e/ # Playwright tests
+│   ├── specs/qr-scanner-registry/  # requirements.md, design.md, tasks.md
+│   └── steering/                   # coding guidelines used by the AI agent
+├── .github/workflows/              # CI/CD pipelines
+├── e2e/                            # Playwright tests
 ├── src/
-│ ├── components/ # React + Astro UI components
-│ ├── db/ # Supabase client, mock store, migrations
-│ ├── layouts/ # Astro layouts
-│ ├── lib/ # auth, CSRF, validation, error utilities
-│ ├── middleware/ # session + security middleware
-│ ├── pages/ # Astro pages and /api routes
-│ └── test/ # Vitest suites
-└── public/ # Static assets
+│   ├── components/                 # React + Astro UI components
+│   ├── db/                         # Supabase client, mock store, migrations
+│   ├── layouts/                    # Astro layouts
+│   ├── lib/                        # auth, CSRF, validation, error utilities
+│   ├── middleware/                 # session + security middleware
+│   ├── pages/                      # Astro pages and /api routes
+│   └── test/                       # Vitest suites
+└── public/                         # Static assets
 ```
 
 ## Development Workflow
