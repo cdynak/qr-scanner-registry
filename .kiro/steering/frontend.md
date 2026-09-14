@@ -1,7 +1,8 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: ['*.tsx', '*.astro']
+fileMatchPattern: ["*.tsx", "*.astro"]
 ---
+
 ## Frontend
 
 ### General Guidelines

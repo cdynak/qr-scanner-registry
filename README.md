@@ -54,6 +54,7 @@ USE_MOCK_DB=true
 ```
 
 With mock mode enabled:
+
 - Login skips Google and signs in a deterministic "Local Dev User".
 - Users and scans are stored in an in-memory database (reset when the dev server restarts).
 - No external network calls are made for auth or data.
@@ -112,6 +113,7 @@ This project uses GitHub Actions for continuous integration and deployment:
 ### Test Coverage
 
 The project maintains a minimum of 80% test coverage across:
+
 - Unit tests for all components and utilities
 - Integration tests for API endpoints
 - End-to-end tests for complete user workflows
@@ -121,12 +123,12 @@ The project maintains a minimum of 80% test coverage across:
 ```md
 .
 ├── src/
-│   ├── layouts/    # Astro layouts
-│   ├── pages/      # Astro pages
-│   │   └── api/    # API endpoints
-│   ├── components/ # UI components (Astro & React)
-│   └── assets/     # Static assets
-├── public/         # Public assets
+│ ├── layouts/ # Astro layouts
+│ ├── pages/ # Astro pages
+│ │ └── api/ # API endpoints
+│ ├── components/ # UI components (Astro & React)
+│ └── assets/ # Static assets
+├── public/ # Public assets
 ```
 
 ## AI Development Support

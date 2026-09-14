@@ -27,7 +27,9 @@ needed for local development).
 ## Database Schema
 
 ### Users Table
+
 Stores user information from Google OAuth authentication:
+
 - `id` - UUID primary key
 - `google_id` - Google user ID (unique)
 - `email` - User email address
@@ -37,7 +39,9 @@ Stores user information from Google OAuth authentication:
 - `updated_at` - Last update timestamp
 
 ### Scans Table
+
 Stores QR/barcode scan results:
+
 - `id` - UUID primary key
 - `user_id` - Foreign key to users table
 - `content` - Decoded scan content
@@ -79,6 +83,7 @@ npm run db:migrate
 ```
 
 This will:
+
 1. Create the migrations tracking table
 2. Execute any pending migration files in order
 3. Record which migrations have been run
@@ -97,8 +102,9 @@ This will:
 ## Usage Examples
 
 ### Client-side Usage
+
 ```typescript
-import { supabase, getCurrentUser, isAuthenticated } from './db/supabase';
+import { supabase, getCurrentUser, isAuthenticated } from "./db/supabase";
 
 // Check if user is authenticated
 const authenticated = await isAuthenticated();
@@ -107,23 +113,19 @@ const authenticated = await isAuthenticated();
 const user = await getCurrentUser();
 
 // Query scans
-const { data: scans } = await supabase
-  .from('scans')
-  .select('*')
-  .order('scanned_at', { ascending: false });
+const { data: scans } = await supabase.from("scans").select("*").order("scanned_at", { ascending: false });
 ```
 
 ### Server-side Usage
+
 ```typescript
-import { createServerSupabaseClient } from './db/supabase';
+import { createServerSupabaseClient } from "./db/supabase";
 
 // Create server client with admin privileges
 const supabase = createServerSupabaseClient();
 
 // Perform admin operations
-const { data: users } = await supabase
-  .from('users')
-  .select('*');
+const { data: users } = await supabase.from("users").select("*");
 ```
 
 ## Testing
@@ -135,6 +137,7 @@ npm run test src/test/db
 ```
 
 Tests cover:
+
 - Environment variable validation
 - Client creation and configuration
 - Authentication helper functions

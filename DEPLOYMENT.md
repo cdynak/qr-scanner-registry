@@ -36,21 +36,21 @@ In the Vercel import screen (or later under **Project → Settings → Environme
 Variables**), add the following for the **Production** (and **Preview**)
 environments:
 
-| Variable | Value |
-| --- | --- |
-| `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_ANON_KEY` | Supabase anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key |
-| `PUBLIC_SUPABASE_URL` | Same as `SUPABASE_URL` |
-| `PUBLIC_SUPABASE_ANON_KEY` | Same as `SUPABASE_ANON_KEY` |
-| `SUPABASE_JWT_SECRET` | Supabase → Settings → API → JWT Settings (enables DB-level RLS) |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-| `NEXTAUTH_SECRET` | A random 32-byte secret (see below) |
-| `CSRF_SECRET` | A random secret for CSRF token signing |
-| `NEXTAUTH_URL` | `https://<your-app>.vercel.app` (the deployed URL) |
-| `SITE` | `https://<your-app>.vercel.app` |
-| `NODE_ENV` | `production` |
+| Variable                    | Value                                                           |
+| --------------------------- | --------------------------------------------------------------- |
+| `SUPABASE_URL`              | Your Supabase project URL                                       |
+| `SUPABASE_ANON_KEY`         | Supabase anon key                                               |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key                                       |
+| `PUBLIC_SUPABASE_URL`       | Same as `SUPABASE_URL`                                          |
+| `PUBLIC_SUPABASE_ANON_KEY`  | Same as `SUPABASE_ANON_KEY`                                     |
+| `SUPABASE_JWT_SECRET`       | Supabase → Settings → API → JWT Settings (enables DB-level RLS) |
+| `GOOGLE_CLIENT_ID`          | Google OAuth client ID                                          |
+| `GOOGLE_CLIENT_SECRET`      | Google OAuth client secret                                      |
+| `NEXTAUTH_SECRET`           | A random 32-byte secret (see below)                             |
+| `CSRF_SECRET`               | A random secret for CSRF token signing                          |
+| `NEXTAUTH_URL`              | `https://<your-app>.vercel.app` (the deployed URL)              |
+| `SITE`                      | `https://<your-app>.vercel.app`                                 |
+| `NODE_ENV`                  | `production`                                                    |
 
 Leave `USE_MOCK_DB` unset (or `false`) in production so it uses the real
 database.

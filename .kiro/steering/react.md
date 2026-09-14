@@ -1,7 +1,8 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: ['*.tsx']
+fileMatchPattern: ["*.tsx"]
 ---
+
 ### Guidelines for React
 
 - Use functional components with hooks instead of class components

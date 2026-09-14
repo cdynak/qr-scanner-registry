@@ -18,17 +18,17 @@ graph TB
     F --> G[Supabase Database]
     B --> H[Google OAuth]
     H --> I[Google Identity]
-    
+
     subgraph "Frontend Layer"
         B
         C
         D
     end
-    
+
     subgraph "API Layer"
         E
     end
-    
+
     subgraph "Backend Services"
         F
         G
@@ -50,18 +50,21 @@ graph TB
 ### Core Components
 
 #### 1. Authentication Components
+
 - `LoginButton.tsx`: Google OAuth login interface
 - `UserProfile.tsx`: Display authenticated user information
 - `AuthGuard.tsx`: Route protection wrapper
 - `LogoutButton.tsx`: Session termination
 
 #### 2. Scanner Components
+
 - `QRScanner.tsx`: Main scanning interface using react-qr-barcode-scanner
 - `ScanResult.tsx`: Display and manage scan results
 - `CameraPermissions.tsx`: Handle camera access permissions
 - `ScanHistory.tsx`: List and manage previous scans
 
 #### 3. Layout Components
+
 - `MainLayout.astro`: Primary application layout
 - `Navigation.tsx`: App navigation with authentication state
 - `ErrorBoundary.tsx`: Error handling wrapper
@@ -69,6 +72,7 @@ graph TB
 ### API Interfaces
 
 #### Authentication Endpoints
+
 ```typescript
 // /api/auth/google.ts
 POST /api/auth/google
@@ -83,6 +87,7 @@ POST /api/auth/logout
 ```
 
 #### Scan Management Endpoints
+
 ```typescript
 // /api/scans/create.ts
 POST /api/scans
@@ -106,6 +111,7 @@ DELETE /api/scans/:id
 ### Database Schema (Supabase)
 
 #### Users Table
+
 ```sql
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -119,6 +125,7 @@ CREATE TABLE users (
 ```
 
 #### Scans Table
+
 ```sql
 CREATE TABLE scans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -152,7 +159,7 @@ export interface Scan {
   id: string;
   userId: string;
   content: string;
-  scanType: 'qr' | 'barcode';
+  scanType: "qr" | "barcode";
   format?: string;
   scannedAt: string;
   createdAt: string;
@@ -160,7 +167,7 @@ export interface Scan {
 
 export interface ScanCreateRequest {
   content: string;
-  scanType: 'qr' | 'barcode';
+  scanType: "qr" | "barcode";
   format?: string;
 }
 
@@ -174,18 +181,21 @@ export interface AuthSession {
 ## Error Handling
 
 ### Client-Side Error Handling
+
 - **Camera Access Errors**: Graceful fallback with clear user instructions
 - **Network Errors**: Retry mechanisms with exponential backoff
 - **Authentication Errors**: Automatic redirect to login with error context
 - **Scan Processing Errors**: User-friendly error messages with retry options
 
 ### Server-Side Error Handling
+
 - **Database Connection Errors**: Circuit breaker pattern with health checks
 - **Authentication Failures**: Proper HTTP status codes and error responses
 - **Validation Errors**: Detailed field-level error messages
 - **Rate Limiting**: Implement rate limiting for API endpoints
 
 ### Error Logging
+
 - Client errors logged to browser console in development
 - Server errors logged with structured logging
 - Critical errors reported to monitoring service (future enhancement)
@@ -195,18 +205,21 @@ export interface AuthSession {
 ### Unit Testing with Vitest
 
 #### Component Testing
+
 - Test React components in isolation using React Testing Library
 - Mock external dependencies (Supabase, camera API)
 - Test user interactions and state management
 - Verify accessibility compliance
 
 #### Utility Testing
+
 - Test authentication helpers and session management
 - Test data validation and transformation functions
 - Test API client functions with mocked responses
 - Test error handling scenarios
 
 #### API Testing
+
 - Test API routes with mocked Supabase client
 - Verify request/response validation
 - Test authentication middleware
@@ -215,12 +228,14 @@ export interface AuthSession {
 ### End-to-End Testing with Playwright
 
 #### Authentication Flows
+
 - Test Google OAuth login process (mocked)
 - Verify session persistence across page reloads
 - Test logout functionality
 - Test protected route access
 
 #### Scanning Workflows
+
 - Test camera permission handling
 - Test QR code scanning with mock camera input
 - Test barcode scanning functionality
@@ -228,6 +243,7 @@ export interface AuthSession {
 - Test scan history management
 
 #### Cross-Browser Testing
+
 - Test on Chrome, Firefox, and Safari
 - Test responsive design on mobile devices
 - Test camera functionality on different devices
@@ -235,54 +251,56 @@ export interface AuthSession {
 ### Testing Configuration
 
 #### Vitest Setup
+
 ```typescript
 // vitest.config.ts
 export default defineConfig({
   test: {
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      provider: "v8",
+      reporter: ["text", "json", "html"],
       threshold: {
         global: {
           branches: 80,
           functions: 80,
           lines: 80,
-          statements: 80
-        }
-      }
-    }
-  }
+          statements: 80,
+        },
+      },
+    },
+  },
 });
 ```
 
 #### Playwright Configuration
+
 ```typescript
 // playwright.config.ts
 export default defineConfig({
-  testDir: './e2e',
+  testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  reporter: "html",
   use: {
-    baseURL: 'http://localhost:4321',
-    trace: 'on-first-retry',
+    baseURL: "http://localhost:4321",
+    trace: "on-first-retry",
   },
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
     },
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
     },
     {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
     },
   ],
 });
@@ -291,18 +309,21 @@ export default defineConfig({
 ## Security Considerations
 
 ### Authentication Security
+
 - Use secure HTTP-only cookies for session management
 - Implement CSRF protection for state-changing operations
 - Validate Google OAuth tokens server-side
 - Use Supabase RLS (Row Level Security) for data access control
 
 ### Data Protection
+
 - Encrypt sensitive data at rest in Supabase
 - Use HTTPS for all communications
 - Implement proper input validation and sanitization
 - Follow OWASP security guidelines
 
 ### Camera Privacy
+
 - Request explicit camera permissions
 - Display clear indicators when camera is active
 - Allow users to revoke camera access
@@ -311,12 +332,14 @@ export default defineConfig({
 ## Performance Optimization
 
 ### Frontend Performance
+
 - Use Astro's partial hydration for optimal loading
 - Implement lazy loading for scanner components
 - Optimize bundle size with tree shaking
 - Use service workers for offline functionality (future enhancement)
 
 ### Backend Performance
+
 - Implement database connection pooling
 - Use Supabase's built-in caching mechanisms
 - Optimize database queries with proper indexing
@@ -325,11 +348,13 @@ export default defineConfig({
 ## Deployment and Infrastructure
 
 ### Development Environment
+
 - Local development with Astro dev server
 - Local Supabase instance for testing
 - Environment variables for configuration
 
 ### Production Environment
+
 - Deploy to Vercel or Netlify for optimal Astro performance
 - Use Supabase hosted service for production database
 - Configure proper environment variables and secrets
@@ -338,6 +363,7 @@ export default defineConfig({
 ## Future Enhancements
 
 ### Potential Features
+
 - Bulk scanning capabilities
 - Export scan history to CSV/JSON
 - Scan categorization and tagging

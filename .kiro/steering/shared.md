@@ -1,6 +1,7 @@
 ---
 inclusion: always
 ---
+
 # AI Rules for {app-name}
 
 {project-description}
@@ -26,7 +27,7 @@ When introducing changes to the project, always follow the directory structure b
 - `./src/types.ts` - Shared types for backend and frontend (Entities, DTOs)
 - `./src/components` - Client-side components written in Astro (static) and React (dynamic)
 - `./src/components/ui` - Client-side components from Shadcn/ui
-- `./src/lib` - Services and helpers 
+- `./src/lib` - Services and helpers
 - `./src/assets` - static internal assets
 - `./public` - public assets
 

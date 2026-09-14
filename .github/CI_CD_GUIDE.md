@@ -13,6 +13,7 @@ The CI/CD pipeline is built using GitHub Actions and provides automated testing,
 **Triggers:** Push to `main`/`develop` branches, Pull Requests
 
 **Jobs:**
+
 - **Lint**: Code style and formatting checks
 - **Test**: Unit tests with coverage reporting (Node.js 22.18.0 and 22.x)
 - **Build**: Application build verification
@@ -20,6 +21,7 @@ The CI/CD pipeline is built using GitHub Actions and provides automated testing,
 - **Security**: Dependency audit and vulnerability scanning
 
 **Features:**
+
 - Multi-version Node.js testing
 - Coverage reporting to Codecov
 - Build artifact storage
@@ -30,6 +32,7 @@ The CI/CD pipeline is built using GitHub Actions and provides automated testing,
 **Triggers:** Pull Request events (opened, synchronize, reopened, ready_for_review)
 
 **Features:**
+
 - Merge conflict detection
 - Code quality enforcement
 - Coverage threshold validation (80% minimum)
@@ -37,6 +40,7 @@ The CI/CD pipeline is built using GitHub Actions and provides automated testing,
 - Merge blocking on test failures
 
 **Jobs:**
+
 - **PR Validation**: Comprehensive validation suite
 - **PR Ready**: Success indicator for merge readiness
 - **PR Blocked**: Failure indicator preventing merge
@@ -46,12 +50,14 @@ The CI/CD pipeline is built using GitHub Actions and provides automated testing,
 **Triggers:** Push to `main` branch
 
 **Features:**
+
 - Full test suite execution
 - Comprehensive E2E testing across all test suites
 - Extended artifact retention (30 days)
 - Failure notifications
 
 **Test Suites:**
+
 - Infrastructure tests
 - Authentication tests
 - Scanner functionality tests
@@ -64,6 +70,7 @@ The CI/CD pipeline is built using GitHub Actions and provides automated testing,
 **Triggers:** Scheduled (2 AM UTC daily), Manual dispatch
 
 **Features:**
+
 - Multi-version Node.js testing (20.x, 22.x, 22.18.0)
 - Cross-browser E2E testing (Chromium, Firefox, WebKit)
 - Performance testing with Lighthouse
@@ -75,6 +82,7 @@ The CI/CD pipeline is built using GitHub Actions and provides automated testing,
 The following branch protection rules should be configured for the `main` branch:
 
 ### Required Status Checks
+
 - `lint` (from ci.yml)
 - `test (22.18.0)` (from ci.yml)
 - `test (22.x)` (from ci.yml)
@@ -83,6 +91,7 @@ The following branch protection rules should be configured for the `main` branch
 - `pr-ready` (from pr-checks.yml)
 
 ### Additional Settings
+
 - ✅ Require branches to be up to date before merging
 - ✅ Require pull request reviews before merging (1 reviewer)
 - ✅ Dismiss stale reviews when new commits are pushed
@@ -94,17 +103,20 @@ The following branch protection rules should be configured for the `main` branch
 ## Code Quality Standards
 
 ### Test Coverage
+
 - Minimum 80% coverage required for all PRs
 - Coverage reports generated for unit tests
 - E2E tests cover critical user workflows
 
 ### Linting and Formatting
+
 - ESLint for code quality
 - Prettier for code formatting
 - TypeScript strict mode enabled
 - Accessibility checks included
 
 ### Security
+
 - Automated dependency auditing
 - Vulnerability scanning with configurable severity thresholds
 - CSRF protection validation
@@ -115,21 +127,25 @@ The following branch protection rules should be configured for the `main` branch
 The following environment variables are used in CI:
 
 ### Required for Full Functionality
+
 - `CODECOV_TOKEN`: For coverage reporting
 - `LHCI_GITHUB_APP_TOKEN`: For Lighthouse CI
 - `SNYK_TOKEN`: For security scanning
 
 ### Test Environment
+
 - `NODE_ENV=test`: Set automatically in test environments
 - Test database configurations handled by test setup
 
 ## Artifacts and Reports
 
 ### Build Artifacts
+
 - **Retention**: 7 days (CI), 30 days (main branch)
 - **Contents**: Built application, test results, coverage reports
 
 ### Test Reports
+
 - Unit test results with coverage
 - E2E test results with screenshots/videos on failure
 - Performance reports from Lighthouse
@@ -138,12 +154,14 @@ The following environment variables are used in CI:
 ## Performance Testing
 
 ### Lighthouse CI Configuration
+
 - Performance score minimum: 80%
 - Accessibility score minimum: 90%
 - Best practices score minimum: 80%
 - SEO score minimum: 80%
 
 ### Test URLs
+
 - `http://localhost:4321` (preview server)
 
 ## Troubleshooting
@@ -198,12 +216,14 @@ npx audit-ci --moderate
 ## Monitoring and Notifications
 
 ### Success Indicators
+
 - ✅ All tests pass
 - ✅ Coverage meets threshold
 - ✅ Build completes successfully
 - ✅ Security scans pass
 
 ### Failure Notifications
+
 - GitHub PR comments with detailed results
 - Failed status checks block merging
 - Email notifications for main branch failures
@@ -211,12 +231,14 @@ npx audit-ci --moderate
 ## Continuous Improvement
 
 ### Metrics Tracked
+
 - Test execution time
 - Coverage trends
 - Build success rates
 - Security vulnerability counts
 
 ### Regular Reviews
+
 - Monthly review of CI performance
 - Quarterly security audit
 - Annual workflow optimization
@@ -224,6 +246,7 @@ npx audit-ci --moderate
 ## Getting Help
 
 For CI/CD related issues:
+
 1. Check the GitHub Actions logs
 2. Review this documentation
 3. Check the project's issue tracker

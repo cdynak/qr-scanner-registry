@@ -7,12 +7,14 @@ To ensure code quality and prevent broken code from being merged, configure the 
 Enable "Require status checks to pass before merging" with the following required checks:
 
 ### From `ci.yml` workflow:
+
 - `lint`
 - `test (22.18.0)`
 - `test (22.x)`
 - `build`
 
 ### From `pr-checks.yml` workflow:
+
 - `pr-validation`
 - `pr-ready`
 
@@ -31,6 +33,7 @@ Enable "Require status checks to pass before merging" with the following require
 ## Auto-merge Configuration
 
 Consider enabling auto-merge for PRs that:
+
 - Pass all required status checks
 - Have required reviews
 - Are from trusted contributors
@@ -38,6 +41,7 @@ Consider enabling auto-merge for PRs that:
 ## Deployment Protection
 
 For production deployments, consider adding:
+
 - Required reviewers for deployment
 - Wait timer before deployment
 - Deployment branch restrictions
