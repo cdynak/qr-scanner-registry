@@ -120,41 +120,34 @@ USE_MOCK_DB=true npm run dev   # fully offline, in-memory data
 
 ---
 
-## Recommended follow-up: upgrade to Astro 7
+## Astro 7 upgrade
 
-The app currently runs Astro 5.18.2 (which patched the worst confirmed CVEs).
-`npm audit` still flags a few advisories whose fixes only exist in the Astro 7
-line, including a **high-severity `@astrojs/vercel` issue** — "Unauthenticated
-Path Override via `x-astro-path`" (GHSA-mr6q-rp88-fx84). That one is relevant
-here because the middleware makes auth/CSRF decisions based on `url.pathname`,
-so it is worth prioritizing.
+The app now runs Astro 7 with `@astrojs/node@11`, `@astrojs/vercel@11`,
+`@astrojs/react@6`, `@astrojs/sitemap@latest`, Tailwind's `@tailwindcss/vite@4.3`,
+`@vitejs/plugin-basic-ssl@2.3` and Vitest 4 (all on Vite 8). This cleared the
+advisories that only had fixes in the Astro 7 line, including the
+high-severity `@astrojs/vercel` "Unauthenticated Path Override via
+`x-astro-path`" issue (GHSA-mr6q-rp88-fx84) that mattered here because the
+middleware makes auth/CSRF decisions based on `url.pathname`.
 
-This upgrade was intentionally **not** done as part of routine maintenance
-because it is a **major, non-low-risk migration** (two majors: 5 → 6 → 7):
+`npm audit --omit=dev` now reports zero vulnerabilities. Two low-severity dev-only
+advisories remain in `eslint`'s dependency tree (fixable only by bumping eslint
+outside its currently pinned exact version); left alone since they do not affect
+the shipped app and the audit job is non-blocking.
 
-- **Vite 8** (Astro 7 bundler): requires Vite-8-compatible versions of the Vite
-  plugins used here (`@tailwindcss/vite`, `@vitejs/plugin-basic-ssl`).
-- **New Rust compiler**: stricter about invalid/unclosed HTML. The hand-written
-  `.astro` pages (`index`, `history`, `scanner`, `404`, `error`) must build
-  cleanly under it.
-- **`compressHTML: 'jsx'`** default: whitespace between inline elements can
-  change; needs a visual check.
-- Adapters must move to majors: `@astrojs/node@11`, `@astrojs/vercel@11`,
-  plus `@astrojs/react@latest`, `@astrojs/sitemap@latest`.
-- Node ≥ 22.12.0 required (already satisfied locally and on Vercel).
+Notes from the migration, in case of a future major bump:
 
-Not affected: `@astrojs/db` (removed in v7) is unused; there are no Astro-rendered
-`.md`/`.mdx` pages; there is no `src/fetch.ts` (a newly reserved filename).
-
-### Suggested upgrade procedure (do on a branch)
-
-```bash
-git checkout -b chore/astro-7
-npx @astrojs/upgrade            # upgrades astro + official integrations together
-npm run build                   # fix any Rust-compiler HTML errors it reports
-npm run test                    # keep the unit/integration suite green
-npm run e2e:smoke               # verify unauthenticated pages still render
-```
-
-Then deploy the branch as a Vercel preview and re-run `npm audit --omit=dev` to
-confirm the advisories are cleared before merging.
+- **`USE_MOCK_DB` env coercion**: Astro's env handling changed how shell-provided
+  (non-`.env`-file) values reach `import.meta.env` in server code — a plain
+  `=== "true"` string check stopped matching. `src/db/supabase.ts` now also
+  falls back to `process.env.USE_MOCK_DB` and accepts a real boolean or the
+  string `"true"`.
+- **`astro dev` background daemon**: Astro 7 auto-detects AI-agent environments
+  and detaches `astro dev` into a background process, which broke Playwright's
+  `webServer` (it looked like the process exited immediately). Playwright's
+  config now sets `ASTRO_DEV_BACKGROUND=1` to keep the dev server in the
+  foreground; this has no effect in CI or a normal terminal.
+- No changes were needed for the Rust compiler's stricter HTML parsing, the
+  `compressHTML: 'jsx'` default, or removed features (`@astrojs/db` unused, no
+  `src/fetch.ts`, no Markdown pages) — the existing `.astro` files and content
+  already conformed.
