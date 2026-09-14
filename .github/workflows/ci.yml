@@ -136,7 +136,6 @@ jobs:
   security:
     name: Security Audit
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout code
@@ -152,7 +151,9 @@ jobs:
         run: npm ci
 
       - name: Run security audit
+        continue-on-error: true
         run: npm audit --audit-level=moderate
 
       - name: Check for known vulnerabilities
+        continue-on-error: true
         run: npx audit-ci --moderate
