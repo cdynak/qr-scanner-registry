@@ -2,10 +2,21 @@ import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 import { createMockSupabaseClient } from "./mock-supabase";
 
-// Environment variables validation - handle both server and client side
-const supabaseUrl = import.meta.env.SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+// Environment variables validation - handle both server and client side.
+// Astro/Vite statically inline `import.meta.env.KEY` at build time; a key
+// that is absent from both the build-time shell env and any `.env` file gets
+// baked in as `undefined` forever, even if it's supplied later via a real
+// process env var (as a container runtime does). The `process.env` fallback
+// keeps these configurable without rebuilding — e.g. a Docker image built
+// with no secrets present can still be configured entirely via `docker run
+// -e`. Client-side code never sees `process.env`, so this only affects the
+// server bundle; the browser bundle still gets the PUBLIC_-prefixed values
+// baked in as intended.
+const processEnv = typeof process !== "undefined" ? process.env : undefined;
+const supabaseUrl = import.meta.env.SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || processEnv?.SUPABASE_URL;
+const supabaseAnonKey =
+  import.meta.env.SUPABASE_ANON_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || processEnv?.SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY || processEnv?.SUPABASE_SERVICE_ROLE_KEY;
 
 /**
  * Local/offline mode: when USE_MOCK_DB is "true", the app uses an in-memory
@@ -14,11 +25,8 @@ const supabaseServiceRoleKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
  * the flag is off.
  */
 // Astro coerces "true"/"false" env values to booleans, so accept both forms.
-// process.env is the fallback for a flag passed on the shell (Playwright, CI).
 const mockDbFlag: unknown =
-  import.meta.env.USE_MOCK_DB ??
-  import.meta.env.PUBLIC_USE_MOCK_DB ??
-  (typeof process !== "undefined" ? process.env.USE_MOCK_DB : undefined);
+  import.meta.env.USE_MOCK_DB ?? import.meta.env.PUBLIC_USE_MOCK_DB ?? processEnv?.USE_MOCK_DB;
 export const useMockDb = mockDbFlag === true || mockDbFlag === "true";
 
 // Only validate on server side or when actually needed (skip in mock mode).
