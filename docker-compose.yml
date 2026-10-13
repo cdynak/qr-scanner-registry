@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    image: ghcr.io/cdynak/qr-scanner-registry:latest
+    ports:
+      - "3000:3000"
+    env_file:
+      # Copy .env.example to .env and fill in real values, or just set
+      # USE_MOCK_DB=true there for a no-config quick start.
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+    restart: unless-stopped

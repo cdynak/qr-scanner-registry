@@ -8,6 +8,16 @@ import { AuthenticationError, NetworkError, logError, retryWithBackoff } from ".
 import { getClientIP } from "../../../lib/security";
 import { sanitizeUserInput } from "../../../lib/validation";
 
+// `import.meta.env.KEY` is statically inlined at build time; a key absent at
+// build time is baked in as `undefined` forever, even once a real value is
+// supplied via process env at runtime (as a container does). Falling back to
+// `process.env` keeps these configurable without rebuilding — see the same
+// pattern and rationale in `src/db/supabase.ts`.
+const processEnv = typeof process !== "undefined" ? process.env : undefined;
+const googleClientId = import.meta.env.GOOGLE_CLIENT_ID || processEnv?.GOOGLE_CLIENT_ID;
+const googleClientSecret = import.meta.env.GOOGLE_CLIENT_SECRET || processEnv?.GOOGLE_CLIENT_SECRET;
+const nextAuthUrl = import.meta.env.NEXTAUTH_URL || processEnv?.NEXTAUTH_URL;
+
 /**
  * Local/offline login: skips Google entirely and signs in a deterministic
  * development user backed by the in-memory store. Only used when USE_MOCK_DB
@@ -48,11 +58,7 @@ async function mockLogin(redirect: (url: string) => Response): Promise<Response>
 }
 
 function getOAuthClient() {
-  return new google.auth.OAuth2(
-    import.meta.env.GOOGLE_CLIENT_ID,
-    import.meta.env.GOOGLE_CLIENT_SECRET,
-    `${import.meta.env.NEXTAUTH_URL}/api/auth/google`
-  );
+  return new google.auth.OAuth2(googleClientId, googleClientSecret, `${nextAuthUrl}/api/auth/google`);
 }
 
 /**
@@ -65,7 +71,7 @@ function initiateOAuth(redirect: (url: string) => Response): Response | Promise<
   }
 
   try {
-    if (!import.meta.env.GOOGLE_CLIENT_ID || !import.meta.env.GOOGLE_CLIENT_SECRET) {
+    if (!googleClientId || !googleClientSecret) {
       throw new AuthenticationError("OAuth configuration missing");
     }
 

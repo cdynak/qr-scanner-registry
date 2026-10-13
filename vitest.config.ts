@@ -14,6 +14,7 @@ export default defineConfig(
           "node_modules/",
           "dist/",
           ".astro/",
+          ".vercel/",
           "coverage/",
           "**/*.d.ts",
           "**/*.config.*",

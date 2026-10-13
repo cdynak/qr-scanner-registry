@@ -92,6 +92,52 @@ GitHub Actions workflows live in `.github/workflows/`:
 
 Deployments to Vercel happen automatically on every push to `master` (see [DEPLOYMENT.md](DEPLOYMENT.md)).
 
+## Run with Docker
+
+A production image is published on every push to `master` as
+[`ghcr.io/cdynak/qr-scanner-registry:latest`](https://github.com/cdynak/qr-scanner-registry/pkgs/container/qr-scanner-registry)
+(workflow: `.github/workflows/docker-publish.yml`). It runs the same
+server-rendered app via the `@astrojs/node` standalone adapter, as a plain
+HTTP server with no reverse proxy or TLS included — put one in front if you
+expose it to the internet directly (the browser's camera API requires HTTPS).
+
+No `.env` file or secret is ever present during the image build (see
+`.dockerignore`); every setting is supplied at `docker run` time as an
+environment variable, using the same names as `.env.example`.
+
+Quick start, fully offline (no Supabase or Google OAuth needed):
+
+```bash
+docker run -p 3000:3000 -e USE_MOCK_DB=true ghcr.io/cdynak/qr-scanner-registry:latest
+```
+
+With a real Supabase project and Google OAuth client:
+
+```bash
+docker run -p 3000:3000 \
+  -e SUPABASE_URL=https://your-project.supabase.co \
+  -e SUPABASE_ANON_KEY=your-anon-key \
+  -e SUPABASE_SERVICE_ROLE_KEY=your-service-role-key \
+  -e SUPABASE_JWT_SECRET=your-jwt-secret \
+  -e GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com \
+  -e GOOGLE_CLIENT_SECRET=your-client-secret \
+  -e NEXTAUTH_URL=https://your-domain.example \
+  -e CSRF_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))") \
+  ghcr.io/cdynak/qr-scanner-registry:latest
+```
+
+Or with Compose, after copying `.env.example` to `.env` and filling it in:
+
+```bash
+docker compose up --build
+```
+
+To build the image locally instead of pulling it:
+
+```bash
+docker build -t qr-scanner-registry .
+```
+
 ## Project Structure
 
 ```text
