@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GET } from "../../../pages/api/scans/list";
 import type { APIContext } from "astro";
 import type { User, Scan } from "../../../types";

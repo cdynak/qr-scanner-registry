@@ -70,3 +70,66 @@ describe("mock Supabase client", () => {
     expect((data as any[]).length).toBe(0);
   });
 });
+
+describe("mock Supabase client – query builder edge cases", () => {
+  beforeEach(() => {
+    __resetMockDb();
+  });
+
+  it("insert without single() returns an array and honours a caller-provided id", async () => {
+    const db = createMockSupabaseClient();
+    const { data, error } = await db.from("scans").insert({ id: "fixed-id", user_id: "u1", content: "a" }).select();
+
+    expect(error).toBeNull();
+    expect(Array.isArray(data)).toBe(true);
+    expect((data as any[])[0].id).toBe("fixed-id");
+  });
+
+  it("filters with gte/lte on ISO timestamps", async () => {
+    const db = createMockSupabaseClient();
+    await db.from("scans").insert({ user_id: "u1", content: "old", scanned_at: "2026-01-01T00:00:00.000Z" });
+    await db.from("scans").insert({ user_id: "u1", content: "mid", scanned_at: "2026-06-01T00:00:00.000Z" });
+    await db.from("scans").insert({ user_id: "u1", content: "new", scanned_at: "2026-12-01T00:00:00.000Z" });
+
+    const { data } = await db
+      .from("scans")
+      .select("*")
+      .gte("scanned_at", "2026-03-01T00:00:00.000Z")
+      .lte("scanned_at", "2026-09-01T00:00:00.000Z");
+
+    expect((data as any[]).map((r) => r.content)).toEqual(["mid"]);
+  });
+
+  it("orders ascending by default and keeps equal keys stable", async () => {
+    const db = createMockSupabaseClient();
+    await db.from("scans").insert({ user_id: "u1", content: "b", scanned_at: "2" });
+    await db.from("scans").insert({ user_id: "u1", content: "a", scanned_at: "1" });
+    await db.from("scans").insert({ user_id: "u1", content: "c", scanned_at: "2" });
+
+    const { data, count } = await db.from("scans").select("*").order("scanned_at");
+
+    expect((data as any[]).map((r) => r.content)).toEqual(["a", "b", "c"]);
+    // count is only populated when requested via select(..., { count })
+    expect(count).toBeUndefined();
+  });
+
+  it("update without a match returns PGRST116 for single() and an empty list otherwise", async () => {
+    const db = createMockSupabaseClient();
+
+    const single = await db.from("users").update({ name: "x" }).eq("google_id", "missing").select().single();
+    expect(single.data).toBeNull();
+    expect((single.error as any).code).toBe("PGRST116");
+
+    const many = await db.from("users").update({ name: "x" }).eq("google_id", "missing").select();
+    expect(many.error).toBeNull();
+    expect(many.data).toEqual([]);
+  });
+
+  it("creates an empty store for tables it has not seen before", async () => {
+    const db = createMockSupabaseClient();
+    const { data, error } = await db.from("audit_log").select("*");
+
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
+  });
+});

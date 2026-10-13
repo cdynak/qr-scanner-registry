@@ -178,8 +178,7 @@ class MockQuery implements PromiseLike<{ data: unknown; error: unknown; count?: 
   // Thenable so `await query` works like the real Supabase builder.
   then<TResult1 = { data: unknown; error: unknown; count?: number }, TResult2 = never>(
     onfulfilled?:
-      | ((value: { data: unknown; error: unknown; count?: number }) => TResult1 | PromiseLike<TResult1>)
-      | null,
+      ((value: { data: unknown; error: unknown; count?: number }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): PromiseLike<TResult1 | TResult2> {
     try {

@@ -31,7 +31,10 @@ const mockOauth2 = {
 vi.mock("googleapis", () => ({
   google: {
     auth: {
-      OAuth2: vi.fn().mockImplementation(() => mockOAuth2Instance),
+      // Called with `new` by the route; Vitest 4 requires a real function for that.
+      OAuth2: vi.fn(function OAuth2() {
+        return mockOAuth2Instance;
+      }),
     },
     oauth2: vi.fn().mockReturnValue(mockOauth2),
   },

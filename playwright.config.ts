@@ -53,6 +53,11 @@ export default defineConfig({
       // they are PUBLIC_-prefixed, so set both spellings (the app reads either).
       USE_MOCK_DB: "true",
       PUBLIC_USE_MOCK_DB: "true",
+      // Astro 7 detaches `astro dev` into a background daemon when it detects an
+      // AI-agent environment, which makes Playwright think the server exited.
+      // Setting this variable disables that auto-detection so the server stays
+      // in the foreground (it has no effect in CI or a normal terminal).
+      ASTRO_DEV_BACKGROUND: "1",
     },
   },
 });
