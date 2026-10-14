@@ -1,0 +1,50 @@
+name: Delete Untagged Images
+description: Deletes old untagged images from GitHub Container Registry
+inputs:
+  owner:
+    description: The repository owner
+    required: true
+  package:
+    description: The package name
+    required: true
+  password:
+    description: Token password
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Delete old untagged images from GHCR
+      env:
+        GH_TOKEN: ${{ inputs.password }}
+        OWNER: ${{ inputs.owner }}
+        PACKAGE: ${{ inputs.package }}
+      run: |
+        sleep 10s
+        echo "Fetching untagged image versions..."
+        # Get untagged images, sort by creation date (newest first)
+        versions=$(gh api \
+          -H "Accept: application/vnd.github+json" \
+          /users/$OWNER/packages/container/$PACKAGE/versions \
+          --paginate \
+          --jq '.[] | select(.metadata.container.tags | length == 0) | {id: .id, created_at: .created_at}' |
+          jq -s 'sort_by(.created_at) | reverse | .[]')
+
+        # Count untagged images
+        count=$(echo "$versions" | jq -s 'length')
+        echo "Found $count untagged images"
+
+        # Keep last 6 untagged images, delete older ones
+        keep=6
+        if [ $count -gt $keep ]; then
+          echo "Keeping newest $keep untagged images, deleting $((count - keep)) older ones"
+          echo "$versions" | jq -r ".id" | tail -n +$((keep + 1)) | while read id; do
+            echo "Deleting old untagged version $id"
+            gh api \
+              -X DELETE \
+              -H "Accept: application/vnd.github+json" \
+              /users/$OWNER/packages/container/$PACKAGE/versions/$id
+          done
+        else
+          echo "Only $count untagged images found, keeping all (up to $keep)"
+        fi
+      shell: bash
